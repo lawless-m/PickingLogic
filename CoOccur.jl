@@ -31,11 +31,31 @@ using MultivariateStats
 
 db = SQLite.DB("G:\\Heinemann\\HIA_Orders.sqlite")
 
-macro denull(sql, col)
-	:([get(x) for x in SQLite.query(db, $sql)[$col]])
+macro denull(data, col)
+	:([get(x) for x in $data[$col]])
 end
 
-const parts = @denull "select prtnum from SKUs order by prtnum" :prtnum
+macro denullSQL(sql, col)
+	:(@denull(SQLite.query(db, $sql), $col))
+end
+
+macro dictCols(sql, ks, vs) # create dictionary, one column as keys, one as values
+	return quote
+		data = SQLite.query(db, $sql)
+		dct = Dict{eltype(data[$ks][1]), eltype(data[$vs][1])}()
+		for k in 1:size(data)[1]
+			dct[get(data[$ks][k])] = get(data[$vs][k])
+		end
+		dct
+	end
+end
+			
+
+macro vsort(d) # dictionary keys sorted by the values
+	:(sort(collect(keys($d)), lt=(v1, v2)->$d[v1]<$d[v2]))
+end
+
+const parts = @denullSQL("select prtnum from SKUs order by prtnum", :prtnum)
 
 function occurs()
 	occur = zeros(Float32, size(parts)[1], size(parts)[1])
@@ -53,8 +73,8 @@ function occurs()
 		end
 	end
 	
-	for o in @denull "select distinct ordnum from OrderLine order by ordnum" :ordnum
-		procOrder(@denull "select distinct prtnum FROM OrderLine WHERE ordnum=$o order by prtnum" :prtnum)
+	for o in @denullSQL("select distinct ordnum from OrderLine order by ordnum", :ordnum)
+		procOrder(@denullSQL("select distinct prtnum FROM OrderLine WHERE ordnum=$o order by prtnum",:prtnum))
 	end
 	
 	for k in 1:size(parts)[1] # is this appropriate ? self correlation zero or should it be maximum ?
@@ -83,6 +103,13 @@ function clusters(occ, k=14)
 	return d
 end
 
+function velocity()
+	# dictionary keys of partnumbers sorted by number of times picked
+	counts = @dictCols("SELECT prtnum, count(prtnum) as cnt from OrderLine GROUP BY prtnum", :prtnum, :cnt)
+	order = @vsort(counts)
+	(counts, order)
+end
+
 function writeCluster(fn, assignments)
 	for v in assignments
 		@printf fn "%d" v[1] # cluster no.
@@ -109,4 +136,9 @@ function writeOccurs(fn, occ)
 	close(o)
 end
 
-clusters(occurs()))
+#clusters(occurs()))
+
+println(velocity())
+
+
+
