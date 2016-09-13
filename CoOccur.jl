@@ -25,23 +25,22 @@ http://clusteringjl.readthedocs.io/en/latest/kmeans.html
 
 =#
 
-using ExcelReaders
+using SQLite
 using Clustering
 using MultivariateStats 
 
+db = SQLite.DB("G:\\Heinemann\\HIA_Orders.sqlite")
 
-function procXLS()
-	
+macro denull(sql, col)
+	:([get(x) for x in SQLite.query(db, $sql)[$col]])
+end
 
-	xl = readxlsheet("g:/Heinemann/ord_line_raw_data.xlsx", "LextEdit Export 08-24-16 02.28")
+const parts = @denull "select prtnum from SKUs order by prtnum" :prtnum
 
-	parts = unique(sort([parse(Int64, x) for x in xl[2:end, 4]]))
-	occur = zeros(Float32, length(parts), length(parts))
+function occurs()
+	occur = zeros(Float32, size(parts)[1], size(parts)[1])
 
 	function procOrder(order)
-		if length(order) == 0
-			return
-		end
 		for p in 1:size(parts)[1]
 			if parts[p] in order
 				for q in 1:size(parts)[1]
@@ -54,60 +53,60 @@ function procXLS()
 		end
 	end
 	
-	prevord = 0
-	ordparts = Set{Int64}()
-	for d in 2:size(xl)[1] # first row is headers
-		ordnum = parse(xl[d, 2]) # column 2
-		prtnum = parse(xl[d, 4]) # column 4
-		if prevord != ordnum
-			procOrder(ordparts)
-			ordparts = Set{Int64}()
-			prevord = ordnum
-		end
-		push!(ordparts, prtnum)
+	for o in @denull "select distinct ordnum from OrderLine order by ordnum" :ordnum
+		procOrder(@denull "select distinct prtnum FROM OrderLine WHERE ordnum=$o order by prtnum" :prtnum)
 	end
-
-	procOrder(ordparts)
 	
 	for k in 1:size(parts)[1] # is this appropriate ? self correlation zero or should it be maximum ?
 		occur[k, k] = 0
 	end
-
-	serialize(open("parts.jls", "w+"), parts)
-	serialize(open("occur.jls", "w+"), occur)
 	
-	return parts, occur
+	return occur
 end
 
-function loadIt()
-	return deserialize(open("parts.jls", "r")), deserialize(open("occur.jls", "r"))
+function reduceDim(occ, dims)
+	projection(fit(PCA, occ; maxoutdim=dims))
 end
 
-function reduceDim(occ)
-	
-	M = fit(PCA, occ; maxoutdim=30)
-	projs = projection(M)
-
-end
-
-function cluster(parts, occ)
-	R = kmeans(occ, 14; maxiter=200)
+function clusters(occ, k=14)
+	R = kmeans(occ, k; maxiter=200)
 	A = assignments(R)
-	d = Dict{Int64, Int32}()
-	for i in 1:size(A)[1]
-		d[parts[i]]=A[i]
+	d = Vector{Vector{Int64}}(k)
+	for i in 1:k
+		d[i] = []
 	end
+	
+	for i in 1:size(A)[1]
+		push!(d[A[i]], parts[i])
+	end
+	
 	return d
 end
 
-function writeCluster(fn, assignment)
-	for a in assignment
-		@printf fn "%d\t%d\r\n" a[1] a[2]
+function writeCluster(fn, assignments)
+	for v in assignments
+		@printf fn "%d" v[1] # cluster no.
+		for p in v[2:end]
+			@printf fn "\t%d" p # part no.s
+		end
+		@printf fn "\r\n"
 	end
 end
 
-writeCluster(open("cluster.txt", "w+"), cluster(procXLS()...))
+function writeOccurs(fn, occ)
+	o = open("$fn.txt", "w+")
+	for i in 1:size(parts)[1]
+		@printf o "\t%s" parts[i]
+	end
+	@printf o "\r\n"
+	for i in 1:size(parts)[1]
+		@printf o "%s" parts[i]
+		for k in 1:size(parts)[1]
+			@printf o "\t%s" occ[i, k]
+		end
+		@printf o "\r\n"
+	end
+	close(o)
+end
 
-
-
-
+clusters(occurs()))
