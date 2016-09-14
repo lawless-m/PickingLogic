@@ -69,10 +69,5 @@ function writePGM(R, B, L)
 	close(img)
 end
 
-function buildDict()
-
-
-end
-
 
 end

@@ -25,11 +25,13 @@ http://clusteringjl.readthedocs.io/en/latest/kmeans.html
 
 =#
 
+cd(ENV["USERPROFILE"] * "/Documents")
+
 using SQLite
 using Clustering
-using MultivariateStats 
+using MultivariateStats
 
-db = SQLite.DB("G:\\Heinemann\\HIA_Orders.sqlite")
+db = SQLite.DB("Databases/HIA_Orders.sqlite")
 
 macro denull(data, col)
 	:([get(x) for x in $data[$col]])
@@ -55,7 +57,7 @@ macro vsort(d) # dictionary keys sorted by the values
 	:(sort(collect(keys($d)), lt=(v1, v2)->$d[v1]<$d[v2]))
 end
 
-const parts = @denullSQL("select prtnum from SKUs order by prtnum", :prtnum)
+const parts = @denullSQL("SELECT prtnum FROM SKUs WHERE location IS NOT NULL ORDER BY prtnum", :prtnum)
 
 function occurs()
 	occur = zeros(Float32, size(parts)[1], size(parts)[1])
@@ -73,8 +75,8 @@ function occurs()
 		end
 	end
 	
-	for o in @denullSQL("select distinct ordnum from OrderLine order by ordnum", :ordnum)
-		procOrder(@denullSQL("select distinct prtnum FROM OrderLine WHERE ordnum=$o order by prtnum",:prtnum))
+	for o in @denullSQL("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
+		procOrder(@denullSQL("SELECT DISTINCT prtnum FROM OrderLine WHERE ordnum=$o ORDER BY prtnum",:prtnum))
 	end
 	
 	for k in 1:size(parts)[1] # is this appropriate ? self correlation zero or should it be maximum ?
@@ -105,7 +107,7 @@ end
 
 function velocity()
 	# dictionary keys of partnumbers sorted by number of times picked
-	counts = @dictCols("SELECT prtnum, count(prtnum) as cnt from OrderLine GROUP BY prtnum", :prtnum, :cnt)
+	counts = @dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
 	order = @vsort(counts)
 	(counts, order)
 end
