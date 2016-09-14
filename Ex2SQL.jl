@@ -25,7 +25,7 @@ macro insert(stmt, binds)
 		SQLite.execute!($stmt)
 	end
 end
-#
+=#
 
 i64(a::Float64) = round(Int64, a)
 i64(a::AbstractString) = parse(Int64, a)
