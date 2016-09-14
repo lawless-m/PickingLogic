@@ -51,7 +51,6 @@ macro dictCols(sql, ks, vs) # create dictionary, one column as keys, one as valu
 		dct
 	end
 end
-			
 
 macro vsort(d) # dictionary keys sorted by the values
 	:(sort(collect(keys($d)), lt=(v1, v2)->$d[v1]<$d[v2]))
@@ -59,16 +58,16 @@ end
 
 const parts = @denullSQL("SELECT prtnum FROM SKUs WHERE location IS NOT NULL ORDER BY prtnum", :prtnum)
 
-function occurs()
-	occur = zeros(Float32, size(parts)[1], size(parts)[1])
 
+function occurrences()
+	occ = zeros(Float32, size(parts)[1], size(parts)[1]) 
 	function procOrder(order)
 		for p in 1:size(parts)[1]
 			if parts[p] in order
 				for q in 1:size(parts)[1]
 					if parts[q] in order
-						occur[p, q] += 1 
-						occur[q, p] += 1 					
+						occ[p, q] += 1 
+						occ[q, p] += 1 					
 					end
 				end
 			end
@@ -80,36 +79,51 @@ function occurs()
 	end
 	
 	for k in 1:size(parts)[1] # is this appropriate ? self correlation zero or should it be maximum ?
-		occur[k, k] = 0
+		occ[k, k] = 0
 	end
-	
-	return occur
+	occ
 end
 
 function reduceDim(occ, dims)
 	projection(fit(PCA, occ; maxoutdim=dims))
 end
 
-function clusters(occ, k=14)
-	R = kmeans(occ, k; maxiter=200)
+function clusters()
+	cs = Vector{Vector{Int64}}(SLOTS)
+	R = kmeans(occurrence, SLOTS; maxiter=200)
 	A = assignments(R)
-	d = Vector{Vector{Int64}}(k)
-	for i in 1:k
-		d[i] = []
+	for i in 1:SLOTS
+		cs[i] = []
 	end
 	
-	for i in 1:size(A)[1]
-		push!(d[A[i]], parts[i])
+	for i in 1:SLOTS
+		push!(cs[A[i]], parts[i])
 	end
-	
-	return d
+	cs
 end
 
-function velocity()
+function velocityDict()
 	# dictionary keys of partnumbers sorted by number of times picked
-	counts = @dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
-	order = @vsort(counts)
-	(counts, order)
+	@dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
+	#order = @vsort(ans)
+end
+
+function velocities()
+	v = zeros(Float64, SLOTS)
+	pv = velocityDict()
+	for k in 1:SLOTS	
+		for p in cluster[k]
+			v[k] += pv[p]
+		end
+	end
+	v
+end
+
+function printSortedClusters()
+	for k in sortperm(velocity)
+		@printf "%d\t" velocity[k]
+		println(cluster[k])
+	end
 end
 
 function writeCluster(fn, assignments)
@@ -138,9 +152,15 @@ function writeOccurs(fn, occ)
 	close(o)
 end
 
-#clusters(occurs()))
+const SLOTS = 14
+const occurrence = occurrences()
+const cluster = clusters()
+const velocity = velocities()
 
-println(velocity())
+printSortedClusters()
+
+
+
 
 
 
