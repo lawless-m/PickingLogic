@@ -24,26 +24,25 @@ http://clusteringjl.readthedocs.io/en/latest/kmeans.html
 
 
 =#
+module CoOccur
 
-cd(ENV["USERPROFILE"] * "/Documents")
 
 using SQLite
 using Clustering
 using MultivariateStats
 
-db = SQLite.DB("Databases/HIA_Orders.sqlite")
 
-macro denull(data, col)
-	:([get(x) for x in $data[$col]])
+function denull(data, col)
+	[get(x) for x in data[col]]
 end
 
-macro denullSQL(sql, col)
-	:(@denull(SQLite.query(db, $sql), $col))
+function denull(sql::AbstractString, col)
+	denull(SQLite.query(DB, sql), col)
 end
 
 macro dictCols(sql, ks, vs) # create dictionary, one column as keys, one as values
 	return quote
-		data = SQLite.query(db, $sql)
+		data = SQLite.query(DB, $sql)
 		dct = Dict{eltype(data[$ks][1]), eltype(data[$vs][1])}()
 		for k in 1:size(data)[1]
 			dct[get(data[$ks][k])] = get(data[$vs][k])
@@ -56,73 +55,62 @@ macro vsort(d) # dictionary keys sorted by the values
 	:(sort(collect(keys($d)), lt=(v1, v2)->$d[v1]<$d[v2]))
 end
 
-const parts = @denullSQL("SELECT prtnum FROM SKUs WHERE location IS NOT NULL ORDER BY prtnum", :prtnum)
-
-
-function occurrences()
-	occ = zeros(Float32, size(parts)[1], size(parts)[1]) 
+function fillOccurrences!()
 	function procOrder(order)
-		for p in 1:size(parts)[1]
-			if parts[p] in order
-				for q in 1:size(parts)[1]
-					if parts[q] in order
-						occ[p, q] += 1 
-						occ[q, p] += 1 					
-					end
-				end
+		for i in 1:size(order)[1]
+			p = searchsorted(PARTS, order[i])
+			for k in i+1:size(order)[1]
+				q = searchsorted(PARTS, order[k])[1]
+				OCCURRENCE[p, q] += 1 
+				OCCURRENCE[q, p] += 1 	
 			end
 		end
 	end
 	
-	for o in @denullSQL("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
-		procOrder(@denullSQL("SELECT DISTINCT prtnum FROM OrderLine WHERE ordnum=$o ORDER BY prtnum",:prtnum))
+	for o in denull("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
+		procOrder(denull("SELECT DISTINCT OrderLine.prtnum FROM OrderLine, SKUs WHERE OrderLine.ordnum=$o AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY OrderLine.prtnum", :prtnum))
 	end
-	
-	for k in 1:size(parts)[1] # is this appropriate ? self correlation zero or should it be maximum ?
-		occ[k, k] = 0
-	end
-	occ
 end
 
-function reduceDim(occ, dims)
-	projection(fit(PCA, occ; maxoutdim=dims))
+function reduceDim(dims)
+	projection(fit(PCA, OCCURRENCE; maxoutdim=dims))
 end
 
-function clusters()
-	cs = Vector{Vector{Int64}}(SLOTS)
-	R = kmeans(occurrence, SLOTS; maxiter=200)
+function kclusters(k)
+	cs = Vector{Vector{Int64}}(k)
+	R = kmeans(OCCURRENCE, k; maxiter=200)
 	A = assignments(R)
-	for i in 1:SLOTS
+	for i in 1:k
 		cs[i] = []
 	end
 	
-	for i in 1:SLOTS
-		push!(cs[A[i]], parts[i])
+	for i in 1:NUMPARTS
+		push!(cs[A[i]], PARTS[i])
 	end
 	cs
 end
 
 function velocityDict()
 	# dictionary keys of partnumbers sorted by number of times picked
-	@dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
+	
 	#order = @vsort(ans)
 end
 
-function velocities()
-	v = zeros(Float64, SLOTS)
-	pv = velocityDict()
-	for k in 1:SLOTS	
-		for p in cluster[k]
-			v[k] += pv[p]
+function clusterVelocities(clus)
+	v = zeros(Float64, size(clus)[1])
+	for k in 1:size(clus)[1]	
+		for p in clus[k]
+			v[k] += VELOCITIES[p]
 		end
 	end
 	v
 end
 
-function printSortedClusters()
-	for k in sortperm(velocity)
-		@printf "%d\t" velocity[k]
-		println(cluster[k])
+function printSortedClusters(clusters)
+	velocities = clusterVelocities(clusters)
+	for k in sortperm(velocities)
+		@printf "%d\t" velocities[k]
+		println(clusters[k])
 	end
 end
 
@@ -136,29 +124,36 @@ function writeCluster(fn, assignments)
 	end
 end
 
-function writeOccurs(fn, occ)
+function writeOccurs(fn)
 	o = open("$fn.txt", "w+")
-	for i in 1:size(parts)[1]
-		@printf o "\t%s" parts[i]
+	for i in 1:NUMPARTS
+		@printf o "\t%s" PARTS[i]
 	end
 	@printf o "\r\n"
-	for i in 1:size(parts)[1]
-		@printf o "%s" parts[i]
-		for k in 1:size(parts)[1]
-			@printf o "\t%s" occ[i, k]
+	for i in 1:NUMPARTS
+		@printf o "%s" PARTS[i]
+		for k in 1:NUMPARTS
+			@printf o "\t%s" OCCURRENCE[i, k]
 		end
 		@printf o "\r\n"
 	end
 	close(o)
 end
 
-const SLOTS = 14
-const occurrence = occurrences()
-const cluster = clusters()
-const velocity = velocities()
+function clusterize(k)
+	clusters = kclusters(k)
+	clusters, clusterVelocities(clusters)
+end
 
-printSortedClusters()
 
+const DB = SQLite.DB("Databases/HIA_Orders.sqlite")
+const PARTS = denull("SELECT DISTINCT SKUs.prtnum FROM OrderLine, SKUs where OrderLine.prtnum = SKUs.prtnum and SKUs.location IS NOT NULL ORDER BY SKUs.prtnum", :prtnum)
+const NUMPARTS = size(PARTS)[1]
+const VELOCITIES = @dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
+const OCCURRENCE = zeros(Float32, NUMPARTS, NUMPARTS) 
+export DB, fillOccurrences!, clusterize
+
+end
 
 
 

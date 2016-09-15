@@ -15,9 +15,9 @@ using Bay2Bay_Costs
 
 macro trans(blk)
 	return quote
-	SQLite.execute!(db, "BEGIN")
+	SQLite.execute!(DB, "BEGIN")
 	$blk
-	SQLite.execute!(db, "COMMIT")
+	SQLite.execute!(DB, "COMMIT")
 	end
 end
 
@@ -34,7 +34,7 @@ end
 
 macro dictCols(sql, ks, vs) # create dictionary, one column as keys, one as values
 	return quote
-		data = SQLite.query(db, $sql)
+		data = SQLite.query(DB, $sql)
 		dct = Dict{eltype(data[$ks][1]), eltype(data[$vs][1])}()
 		for k in 1:size(data)[1]
 			dct[get(data[$ks][k])] = get(data[$vs][k])
@@ -46,25 +46,21 @@ end
 i64(a::Float64) = round(Int64, a)
 i64(a::AbstractString) = parse(Int64, a)
 
-	
-function DB()
-	db = SQLite.DB("Databases/HIA_Orders.sqlite")
-	SQLite.execute!(db, "PRAGMA foreign_keys = ON")
-	@trans if size(SQLite.query(db, "PRAGMA stats"))[1] == 1
-		SQLite.execute!(db, "CREATE TABLE Locations (location INTEGER PRIMARY KEY, label TEXT, UNIQUE(label))")
-		SQLite.execute!(db, "CREATE TABLE Distances  (location1 INTEGER, location2 INTEGER, distance REAL, FOREIGN KEY(location1) REFERENCES Locations(location), FOREIGN KEY(location2) REFERENCES Locations(location), UNIQUE (location1, location2))")	
-		SQLite.execute!(db, "CREATE TABLE SKUs (prtnum INTEGER PRIMARY KEY, location INTEGER, FOREIGN KEY(location) REFERENCES Locations(location))")
-		SQLite.execute!(db, "CREATE TABLE OrderLine (ordnum INTEGER, prtnum INTEGER, qty INTEGER, FOREIGN KEY(prtnum) REFERENCES SKUs(prtnum))")
-		SQLite.execute!(db, "CREATE INDEX OrderLineordnum on OrderLine(ordnum)")
+function createSchema()
+	@trans if size(SQLite.query(DB, "PRAGMA stats"))[1] == 1
+		SQLite.execute!(DB, "CREATE TABLE Locations (location INTEGER PRIMARY KEY, label TEXT, rack INTEGER, level INTEGER, bin INTEGER, UNIQUE(label), UNIQUE(rack, level, bin))")
+		SQLite.execute!(DB, "CREATE TABLE Distances  (lmin INTEGER, lmax INTEGER, distance REAL, FOREIGN KEY(lmin) REFERENCES Locations(location), FOREIGN KEY(lmax) REFERENCES Locations(location), UNIQUE (lmin, lmax))")	
+		SQLite.execute!(DB, "CREATE TABLE SKUs (prtnum INTEGER PRIMARY KEY, location INTEGER, FOREIGN KEY(location) REFERENCES Locations(location))")
+		SQLite.execute!(DB, "CREATE TABLE OrderLine (ordnum INTEGER, prtnum INTEGER, qty INTEGER, FOREIGN KEY(prtnum) REFERENCES SKUs(prtnum))")
+		SQLite.execute!(DB, "CREATE INDEX OrderLineordnum on OrderLine(ordnum)")
 	end
-	return db
 end
 
-function importOrders(db)
+function importOrders()
 	xl = readxlsheet("g:/Heinemann/ord_line_raw_data.xlsx", "LextEdit Export 08-24-16 02.28")
 
-	sku = SQLite.Stmt(db, "INSERT OR IGNORE INTO SKUs (prtnum, location) VALUES(?, NULL)")
-	lne = SQLite.Stmt(db, "INSERT INTO OrderLine (ordnum, prtnum, qty) VALUES(?, ?, ?)")
+	sku = SQLite.Stmt(DB, "INSERT OR IGNORE INTO SKUs (prtnum, location) VALUES(?, NULL)")
+	lne = SQLite.Stmt(DB, "INSERT INTO OrderLine (ordnum, prtnum, qty) VALUES(?, ?, ?)")
 
 	@trans for r in 2:size(xl)[1]
 		SQLite.bind!(sku, 1, i64(xl[r, 4]))
@@ -76,46 +72,61 @@ function importOrders(db)
 	end
 end
 
-function labelLocations(db)
-	loc = SQLite.Stmt(db, "INSERT INTO Locations (label) VALUES(?)")
-	@trans for rack in 81:-1:1, bin in 8:-1:1, level in [10:10:90; 91]				
+function labelLocations()
+	loc = SQLite.Stmt(DB, "INSERT INTO Locations (label, rack, level, bin) VALUES(?, ?, ?, ?)")
+	@trans for rack in 81:-1:1, level in [10:10:90; 91], bin in 8:-1:1				
 		SQLite.bind!(loc, 1, @sprintf "F-%02d-%02d-%02d" rack level bin)
+		SQLite.bind!(loc, 2, rack)
+		SQLite.bind!(loc, 3, level)
+		SQLite.bind!(loc, 4, bin)
 		SQLite.execute!(loc)
 	end
 end
 
-function distances(db)
+function distances()
 	locs = @dictCols("SELECT location, label from Locations", :label, :location)
-	loc =  SQLite.Stmt(db, "SELECT location From Locations WHERE label=?")
-	dist = SQLite.Stmt(db, "INSERT INTO Distances (location1, location2, distance) VALUES(?, ?, ?)")
-	@trans for rack1 in 81:-1:1, bin1 in 8:-1:1, level1 in [10:10:90; 91]
-		l1 = locs[@sprintf "F-%02d-%02d-%02d" rack1 level1 bin1]
-		SQLite.bind!(dist, 1, l1)
-		for rack2 in 81:-1:1, bin2 in 8:-1:1, level2 in [10:10:90; 91]
-			l2 = locs[@sprintf "F-%02d-%02d-%02d" rack2 level2 bin2]
-			if l2 > l1
-				SQLite.bind!(dist, 2, l2)
-				SQLite.bind!(dist, 3, Bay2Bay_Costs.distance(rack1, bin1, level1, rack2, bin2, level2))
+	loc =  SQLite.Stmt(DB, "SELECT location From Locations WHERE label=?")
+	dist = SQLite.Stmt(DB, "INSERT INTO Distances (lmin, lmax, distance) VALUES(?, ?, ?)")
+	@trans for rack1 in 81:-1:1, level1 in [10:10:90; 91], bin1 in 8:-1:1
+		lmin = locs[@sprintf "F-%02d-%02d-%02d" rack1 level1 bin1]
+		SQLite.bind!(dist, 1, lmin)
+		for rack2 in 81:-1:1, level2 in [10:10:90; 91], bin2 in 8:-1:1
+			lmax = locs[@sprintf "F-%02d-%02d-%02d" rack2 level2 bin2]
+			if lmax > lmin
+				SQLite.bind!(dist, 2, lmax)
+				SQLite.bind!(dist, 3, Bay2Bay_Costs.distance(rack1, level1, bin1, rack2, level2, bin2))
 				SQLite.execute!(dist)
 			end
 		end
 	end
 end
 
-function SKUlocations(db)
+function resetSKUlocations()
 	xl = readxlsheet("G:/Heinemann/Travel Sequence/P81 SKU Location R1.xlsx", "SKU Qty Loc")
-	sku = SQLite.Stmt(db, "UPDATE OR IGNORE SKUs SET location=(SELECT location from Locations where label=?) WHERE prtnum=?")
+	prt = SQLite.Stmt(DB, "INSERT OR IGNORE INTO SKUs (prtnum, location) VALUES(?, NULL)")
+	sku = SQLite.Stmt(DB, "UPDATE OR IGNORE SKUs SET location=(SELECT location from Locations where label=?) WHERE prtnum=?")
 	@trans for r in 2:size(xl)[1]
+		SQLite.bind!(prt, 1, i64(xl[r, 1]))
+		SQLite.execute!(prt)
 		SQLite.bind!(sku, 1, xl[r, 4])
 		SQLite.bind!(sku, 2, i64(xl[r, 1]))
 		SQLite.execute!(sku)
 	end
 end
 
-db = DB()
-importOrders(db)
-labelLocations(db)
-SKUlocations(db)
-distances(db)
+function initialise()
+	createSchema()
+	importOrders()
+	labelLocations()
+	distances()
+	resetSKUlocations()
+end
 
+reset = isfile("Databases/HIA_Orders.sqlite")
+const DB = SQLite.DB("Databases/HIA_Orders.sqlite")
+SQLite.execute!(DB, "PRAGMA foreign_keys = ON")
+if reset	
+	initialise()
+end
+resetSKUlocations()
 
