@@ -167,11 +167,16 @@ function initialise()
 	resetSKUlocations()
 end
 
-reset = isfile("Databases/HIA_Orders.sqlite")
-const DB = SQLite.DB("Databases/HIA_Orders.sqlite")
-SQLite.execute!(DB, "PRAGMA foreign_keys = ON")
-if reset	
-	initialise()
+function resetOrInitialize()
+	reset = isfile("Databases/HIA_Orders.sqlite")
+	const DB = SQLite.DB("Databases/HIA_Orders.sqlite")
+	SQLite.execute!(DB, "PRAGMA foreign_keys = ON")
+	if reset	
+		initialise()
+	end
+	resetSKUlocations()
 end
-resetSKUlocations()
+
+end
+
 
