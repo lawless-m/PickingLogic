@@ -19,7 +19,6 @@ macro trans(blk)
 	end
 end
 
-#= doesn;t work
 macro insert(stmt, binds)
 	return quote
 		for i in 1:length($binds)
@@ -28,7 +27,6 @@ macro insert(stmt, binds)
 		SQLite.execute!($stmt)
 	end
 end
-=#
 
 macro denull(T, data, col)
 	:($T[get(x) for x in $data[$col]])
@@ -75,23 +73,15 @@ function importOrders()
 	lne = SQLite.Stmt(DB, "INSERT INTO OrderLine (ordnum, prtnum, qty) VALUES(?, ?, ?)")
 
 	@trans for r in 2:size(xl)[1]
-		SQLite.bind!(sku, 1, i64(xl[r, 4]))
-		SQLite.execute!(sku)
-		SQLite.bind!(lne, 1, i64(xl[r, 2]))
-		SQLite.bind!(lne, 2, i64(xl[r, 4]))
-		SQLite.bind!(lne, 3, i64(xl[r, 5]))
-		SQLite.execute!(lne)	
+		@insert sku (i64(xl[r, 4]))
+		@insert lne (i64(xl[r, 2]), i64(xl[r, 4]), i64(xl[r, 5]))
 	end
 end
 
 function labelLocations()
 	loc = SQLite.Stmt(DB, "INSERT INTO Locations (label, rack, level, bin) VALUES(?, ?, ?, ?)")
 	@trans for rack in 81:-1:1, level in [10:10:90; 91], bin in 8:-1:1				
-		SQLite.bind!(loc, 1, @sprintf "F-%02d-%02d-%02d" rack level bin)
-		SQLite.bind!(loc, 2, rack)
-		SQLite.bind!(loc, 3, level)
-		SQLite.bind!(loc, 4, bin)
-		SQLite.execute!(loc)
+		@insert loc ((@sprintf "F-%02d-%02d-%02d" rack level bin), rack, level, bin)
 	end
 end
 
@@ -101,13 +91,10 @@ function distanceFill()
 	dist = SQLite.Stmt(DB, "INSERT INTO Distances (lmin, lmax, distance) VALUES(?, ?, ?)")
 	@trans for rack1 in 81:-1:1, level1 in [10:10:90; 91], bin1 in 8:-1:1
 		lmin = locs[@sprintf "F-%02d-%02d-%02d" rack1 level1 bin1]
-		SQLite.bind!(dist, 1, lmin)
 		for rack2 in 81:-1:1, level2 in [10:10:90; 91], bin2 in 8:-1:1
 			lmax = locs[@sprintf "F-%02d-%02d-%02d" rack2 level2 bin2]
 			if lmax > lmin
-				SQLite.bind!(dist, 2, lmax)
-				SQLite.bind!(dist, 3, Bay2Bay_Costs.distance(rack1, level1, bin1, rack2, level2, bin2))
-				SQLite.execute!(dist)
+				@insert dist (lmin, lmax, Bay2Bay_Costs.distance(rack1, level1, bin1, rack2, level2, bin2))
 			end
 		end
 	end
@@ -118,18 +105,15 @@ function resetSKUlocations()
 	prt = SQLite.Stmt(DB, "INSERT OR IGNORE INTO SKUs (prtnum, location) VALUES(?, NULL)")
 	sku = SQLite.Stmt(DB, "UPDATE OR IGNORE SKUs SET location=(SELECT location from Locations where label=?) WHERE prtnum=?")
 	@trans for r in 2:size(xl)[1]
-		SQLite.bind!(prt, 1, i64(xl[r, 1]))
-		SQLite.execute!(prt)
-		SQLite.bind!(sku, 1, xl[r, 4])
-		SQLite.bind!(sku, 2, i64(xl[r, 1]))
-		SQLite.execute!(sku)
+		@insert prt (i64(xl[r, 1]))
+		@insert sku (xl[r, 4], i64(xl[r, 1]))
 	end
 end
 
 
 function ordersInRacksTask()
 	for o in i64("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
-		locs = i64("SELECT SKUs.location FROM OrderLine, SKUs WHERE OrderLine.ordnum=$o AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY SKUs.location DESC", :location)
+		locs = i64("SELECT DISTINCT SKUs.location FROM OrderLine, SKUs WHERE OrderLine.ordnum=$o AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY SKUs.location DESC", :location)
 		if size(locs)[1] > 0
 			produce(o, locs)
 		end
