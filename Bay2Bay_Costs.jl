@@ -1,5 +1,7 @@
 module Bay2Bay_Costs
 
+export aisle
+
 #=
 create grid for excel to view
 =#

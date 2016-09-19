@@ -26,49 +26,25 @@ http://clusteringjl.readthedocs.io/en/latest/kmeans.html
 =#
 module CoOccur
 
-
-using SQLite
+using HIADB
 using Clustering
 using MultivariateStats
-
-
-function denull(data, col)
-	[get(x) for x in data[col]]
-end
-
-function denull(sql::AbstractString, col)
-	denull(SQLite.query(DB, sql), col)
-end
-
-macro dictCols(sql, ks, vs) # create dictionary, one column as keys, one as values
-	return quote
-		data = SQLite.query(DB, $sql)
-		dct = Dict{eltype(data[$ks][1]), eltype(data[$vs][1])}()
-		for k in 1:size(data)[1]
-			dct[get(data[$ks][k])] = get(data[$vs][k])
-		end
-		dct
-	end
-end
 
 macro vsort(d) # dictionary keys sorted by the values
 	:(sort(collect(keys($d)), lt=(v1, v2)->$d[v1]<$d[v2]))
 end
 
 function fillOccurrences!()
-	function procOrder(order)
-		for i in 1:size(order)[1]
-			p = searchsorted(PARTS, order[i])
-			for k in i+1:size(order)[1]
-				q = searchsorted(PARTS, order[k])[1]
+	for o in HIADB.orderNumbers()
+		partnums = HIADB.partnumsInRackPerOrder(o)
+		for i in 1:size(partnums)[1]
+			p = searchsorted(PARTS, partnums[i])
+			for k in i+1:size(partnums)[1]
+				q = searchsorted(PARTS, partnums[k])[1]
 				OCCURRENCE[p, q] += 1 
 				OCCURRENCE[q, p] += 1 	
 			end
 		end
-	end
-	
-	for o in denull("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
-		procOrder(denull("SELECT DISTINCT OrderLine.prtnum FROM OrderLine, SKUs WHERE OrderLine.ordnum=$o AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY OrderLine.prtnum", :prtnum))
 	end
 end
 
@@ -105,6 +81,14 @@ function clusterVelocities(clus)
 	end
 	v
 end
+
+function printSortedClusters(clusters, sortby)
+	for k in sortperm(sortby)
+		@printf "%d\t" sortby[k]
+		println(clusters[k])
+	end
+end
+
 
 function printSortedClusters(clusters)
 	velocities = clusterVelocities(clusters)
@@ -146,12 +130,11 @@ function clusterize(k)
 end
 
 
-const DB = SQLite.DB("Databases/HIA_Orders.sqlite")
-const PARTS = denull("SELECT DISTINCT SKUs.prtnum FROM OrderLine, SKUs where OrderLine.prtnum = SKUs.prtnum and SKUs.location IS NOT NULL ORDER BY SKUs.prtnum", :prtnum)
+const PARTS = HIADB.partnumsInRacks()
 const NUMPARTS = size(PARTS)[1]
-const VELOCITIES = @dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
+const VELOCITIES = HIADB.partVelocities()
 const OCCURRENCE = zeros(Float32, NUMPARTS, NUMPARTS) 
-export DB, fillOccurrences!, clusterize
+export fillOccurrences!, clusterize, kclusters, clusterVelocities, printSortedClusters
 
 end
 

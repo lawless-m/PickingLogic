@@ -5,9 +5,7 @@ Ex2SQL.jl
 https://github.com/JuliaDB/SQLite.jl
 =#
 
-cd(ENV["USERPROFILE"] * "/Documents")
-
-unshift!(LOAD_PATH, "GitHub/PickingLogic/")
+module HIADB
 
 using SQLite
 using ExcelReaders
@@ -31,6 +29,20 @@ macro insert(stmt, binds)
 	end
 end
 =#
+
+macro denull(T, data, col)
+	:($T[get(x) for x in $data[$col]])
+end
+
+function denull(sql::AbstractString, col)
+	@denull(SQLite.query(DB, sql), col)
+end
+
+
+function i64(sql::AbstractString, col)
+	@denull(Int64, SQLite.query(DB, sql), col)
+end
+
 
 macro dictCols(sql, ks, vs) # create dictionary, one column as keys, one as values
 	return quote
@@ -83,7 +95,7 @@ function labelLocations()
 	end
 end
 
-function distances()
+function distanceFill()
 	locs = @dictCols("SELECT location, label from Locations", :label, :location)
 	loc =  SQLite.Stmt(DB, "SELECT location From Locations WHERE label=?")
 	dist = SQLite.Stmt(DB, "INSERT INTO Distances (lmin, lmax, distance) VALUES(?, ?, ?)")
@@ -114,11 +126,44 @@ function resetSKUlocations()
 	end
 end
 
+
+function ordersInRacks()
+	for o in i64("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
+		locs = i64("SELECT SKUs.location FROM OrderLine, SKUs WHERE OrderLine.ordnum=$o AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY SKUs.location DESC", :location)
+		if size(locs)[1] > 0
+			produce(o, locs)
+		end
+	end
+end
+
+function distanceByLocation(l1, l2)
+	@denull(Float64, SQLite.query(DB, "SELECT distance FROM Distances WHERE lmin=? AND lmax=?", values=[min(l1, l2), max(l1, l2)]), :distance)[1]
+end
+
+
+
+function orderNumbers()
+	denull("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
+end
+
+function partnumsInRacks()
+	denull("SELECT DISTINCT SKUs.prtnum FROM OrderLine, SKUs where OrderLine.prtnum = SKUs.prtnum and SKUs.location IS NOT NULL ORDER BY SKUs.prtnum", :prtnum)
+end
+
+function partnumsInRackPerOrder(o)
+	denull(SQLite.query(DB, "SELECT DISTINCT OrderLine.prtnum FROM OrderLine, SKUs WHERE OrderLine.ordnum=? AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY OrderLine.prtnum", values=[o]), :prtnum)
+end
+
+function partVelocities()
+	@dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
+end
+
+
 function initialise()
 	createSchema()
 	importOrders()
 	labelLocations()
-	distances()
+	distanceFill()
 	resetSKUlocations()
 end
 
