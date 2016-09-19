@@ -34,8 +34,8 @@ macro denull(T, data, col)
 	:($T[get(x) for x in $data[$col]])
 end
 
-function denull(sql::AbstractString, col)
-	@denull(SQLite.query(DB, sql), col)
+function denull(T, sql::AbstractString, col)
+	@denull(T, SQLite.query(DB, sql), col)
 end
 
 
@@ -127,7 +127,7 @@ function resetSKUlocations()
 end
 
 
-function ordersInRacks()
+function ordersInRacksTask()
 	for o in i64("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
 		locs = i64("SELECT SKUs.location FROM OrderLine, SKUs WHERE OrderLine.ordnum=$o AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY SKUs.location DESC", :location)
 		if size(locs)[1] > 0
@@ -143,21 +143,20 @@ end
 
 
 function orderNumbers()
-	denull("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
+	i64("SELECT DISTINCT ordnum FROM OrderLine ORDER BY ordnum", :ordnum)
 end
 
 function partnumsInRacks()
-	denull("SELECT DISTINCT SKUs.prtnum FROM OrderLine, SKUs where OrderLine.prtnum = SKUs.prtnum and SKUs.location IS NOT NULL ORDER BY SKUs.prtnum", :prtnum)
+	i64("SELECT DISTINCT SKUs.prtnum FROM OrderLine, SKUs where OrderLine.prtnum = SKUs.prtnum and SKUs.location IS NOT NULL ORDER BY SKUs.prtnum", :prtnum)
 end
 
 function partnumsInRackPerOrder(o)
-	denull(SQLite.query(DB, "SELECT DISTINCT OrderLine.prtnum FROM OrderLine, SKUs WHERE OrderLine.ordnum=? AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY OrderLine.prtnum", values=[o]), :prtnum)
+	i64("SELECT DISTINCT OrderLine.prtnum FROM OrderLine, SKUs WHERE OrderLine.ordnum=$o AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY OrderLine.prtnum", :prtnum)
 end
 
 function partVelocities()
 	@dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
 end
-
 
 function initialise()
 	createSchema()
@@ -167,14 +166,11 @@ function initialise()
 	resetSKUlocations()
 end
 
-function resetOrInitialize()
-	reset = isfile("Databases/HIA_Orders.sqlite")
-	const DB = SQLite.DB("Databases/HIA_Orders.sqlite")
-	SQLite.execute!(DB, "PRAGMA foreign_keys = ON")
-	if reset	
-		initialise()
-	end
-	resetSKUlocations()
+reset = !isfile("Databases/HIA_Orders.sqlite")
+const DB = SQLite.DB("Databases/HIA_Orders.sqlite")
+SQLite.execute!(DB, "PRAGMA foreign_keys = ON")
+if reset	
+	initialise()
 end
 
 end

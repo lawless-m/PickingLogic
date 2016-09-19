@@ -2,9 +2,6 @@ module Bay2Bay_Costs
 
 export aisle
 
-#=
-create grid for excel to view
-=#
 				
 const toEnd = [24, 16, 8, 0, 8, 16]
 
