@@ -55,4 +55,9 @@ function orderFreq()
 	qSQL("with ords(prtnum, datum) as (SELECT prtnum , concat(concat(year(entdte), '-'), right(concat('00', month(entdte)), 2)) from ord_line where  client_id='HUS' AND wh_id='MFTZ') select prtnum, count(*) as cnt, datum from ords group by datum, prtnum")
 end
 
+function currentStolocs()
+	qSQL("SELECT distinct CBI.arecod as area, CBI.prtnum as prtnum, CBI.stoloc as stoloc, CBI.untqty as qty, prtdsc.lngdsc as dsc FROM client_blng_inv AS CBI INNER JOIN prtdsc on prtdsc.colval = CONCAT(CBI.prtnum, '|HUS|MFTZ') WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
+end
+
+
 end
