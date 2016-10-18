@@ -36,7 +36,7 @@ end
 
 function fillOccurrences!()
 	for o in HIADB.orderNumbers()
-		partnums = HIADB.partnumsInRackPerOrder(o)
+		partnums = HIADB.partnumsInLocationPerOrder(o)
 		for i in 1:size(partnums)[1]
 			p = searchsorted(PARTS, partnums[i])
 			for k in i+1:size(partnums)[1]
@@ -90,8 +90,7 @@ function printSortedClusters(clusters, sortby)
 end
 
 
-function printSortedClusters(clusters)
-	velocities = clusterVelocities(clusters)
+function printSortedClusters(clusters, velocities)
 	for k in sortperm(velocities)
 		@printf "%d\t" velocities[k]
 		println(clusters[k])
@@ -130,7 +129,7 @@ function clusterize(k)
 end
 
 
-const PARTS = HIADB.partnumsInRacks()
+const PARTS = HIADB.partnumsInOrders()
 const NUMPARTS = size(PARTS)[1]
 const VELOCITIES = HIADB.partVelocities()
 const OCCURRENCE = zeros(Float32, NUMPARTS, NUMPARTS) 

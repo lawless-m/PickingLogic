@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<moca-response><session-id>c01a3c199e82cd7a</session-id><status>0</status>
+
+<moca-results>
+	<metadata>
+		<column name="usr_id" type="S" length="0" nullable="true"/>
+		<column name="locale_id" type="S" length="0" nullable="true"/>
+		<column name="addon_id" type="S" length="0" nullable="true"/>
+		<column name="cust_lvl" type="I" length="0" nullable="true"/>
+		<column name="session_key" type="S" length="0" nullable="true"/>
+		<column name="pswd_expir" type="I" length="0" nullable="true"/>
+		<column name="pswd_expir_dte" type="D" length="0" nullable="true"/>
+		<column name="pswd_disable" type="I" length="0" nullable="true"/>
+		<column name="pswd_chg_flg" type="O" length="0" nullable="true"/>
+		<column name="pswd_expir_flg" type="O" length="0" nullable="true"/>
+		<column name="pswd_warn_flg" type="O" length="0" nullable="true"/>
+		<column name="lic_expir_dte" type="D" length="0" nullable="true"/>
+		<column name="lic_expir_days" type="I" length="0" nullable="true"/>
+		<column name="lic_expir_warn" type="O" length="0" nullable="true"/>
+		<column name="srv_typ" type="S" length="0" nullable="true"/>
+		<column name="super_usr_flg" type="O" length="0" nullable="true"/>
+		<column name="ext_ath_flg" type="O" length="0" nullable="true"/>
+	</metadata>
+	
+	<data>
+		<row><field>MWHEATH</field><field>US_ENGLISH</field><field>3pl,WM,lm,SEAMLES</field><field>10</field><field>;MWHEATH;TMCrvXctGL.g0z_L3Lztvll392</field><field null="true"></field><field null="true"></field><field>6008</field><field>0</field><field>0</field><field>0</field><field null="true"></field><field>-1</field><field>0</field><field>DEVELOPMENT</field><field>0</field><field>0</field></row>
+	</data>
+	
+</moca-results></moca-response>
