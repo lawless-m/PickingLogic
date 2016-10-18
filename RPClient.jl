@@ -124,7 +124,15 @@ macro query(r, sql)
 	:(add_text(new_child($r, "query"), $sql))
 end
 
-function login()
+function login(credfile) # serialized "host"=>"http://$host:$port", "un"=>$un, "pw"=>$pw
+	fid = open(credfile, "r")
+	creds = deserialize(fid)
+	close(fid)
+
+	CREDENTIALS["host"] = creds["host"]
+	CREDENTIALS["un"] = creds["un"]
+	CREDENTIALS["pw"] = creds["pw"]
+
 	newSessionID()
 	resp = @moca [("usr_id",CREDENTIALS["un"]) ("usr_pswd",CREDENTIALS["pw"])] begin
 		@var env "LOCALE_ID" "US_ENGLISH"

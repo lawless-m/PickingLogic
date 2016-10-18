@@ -4,15 +4,7 @@ module HIARP
 using RPClient
 using DataFrames
 
-fid = open("credentials.jls", "r")
-creds = deserialize(fid)
-close(fid)
-
-RPClient.CREDENTIALS["host"] = creds["host"]
-RPClient.CREDENTIALS["un"] = creds["un"]
-RPClient.CREDENTIALS["pw"] = creds["pw"]
-
-login()
+login("credentials.jls")
 
 function inventory()
 	inv = Dict{AbstractString, DataFrame}()
