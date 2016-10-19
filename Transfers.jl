@@ -73,6 +73,7 @@ j = 1
 if j==1
 	fn = "transfers/ALL-F.txt"
 	close(open("G:/Heinemann/" * fn, "w+"))
+	procRacks(fn, [10:10:90; 91])
 elseif j==2
 	fn = "transfers/A-F.txt"
 	close(open("G:/Heinemann/" * fn, "w+"))
