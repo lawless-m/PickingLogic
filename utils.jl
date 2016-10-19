@@ -42,11 +42,7 @@ end
 
 macro fidA(fn, blk)
 	return quote
-		if $fn[2] == ":"
-			fid = open($fn, "a+")
-		else
-			fid = open("G:/Heinemann/" * $fn, "a+")
-		end
+		fid = open($fn[2] == ":" ? $fn : "G:/Heinemann/" * $fn, "a+")
 		$blk
 		close(fid)
 	end
@@ -133,4 +129,66 @@ macro dictCols(sql, ks, vs) # create dictionary, one column as keys, one as valu
 	end
 end
 
+macro serialize(fn, v)
+	return quote
+		fid = open($fn, "w+")
+		serialize(fod, $v)
+		close(fid)
+	end
+end
+macro deserial(fn)
+	return quote
+		fid = open($fn, "r+")
+		v = deserialize(fid)
+		close(fid)
+		v
+	end
+end
+
+function skuLocations()
+	skfn = "g:/Heinemann/skulocRacks.jls"
+	if ! isfile(skfn)
+		deXLS(skfn)
+	end
+	fid = open(skfn, "r")
+	(s, l, r) = deserialize(fid)
+	close(fid)
+	s, l, r
+end
+
+function skuLocationsXLS()
+	skulocs = Dict{Int64, Tuple{AbstractString, Int64}}()
+	locskus = Dict{AbstractString, Int64}()
+	xl = readxlsheet("G:/Heinemann/Travel Sequence/P81 SKU Location R1.xlsx", "SKU Qty Loc")
+	for r in 2:size(xl)[1]
+		if typeof(xl[r, 3]) != DataArrays.NAtype
+			continue
+		end
+		skulocs[Int64(xl[r, 1])] = (xl[r, 4], i64(xl[r, 2]))
+		locskus[xl[r, 4]] = Int64(xl[r, 1])
+	end
+	skulocs, locskus
+end
+
+function rackSkus(skulocs)
+	rks = Dict{AbstractString, Vector{Int64}}()
+	for skuloc in skulocs
+		loc = split(skuloc[2][1], "-")
+		if loc[1] == "F"
+			if !haskey(rks, loc[2])
+				rks[loc[2]] = []
+			end
+			push!(rks[loc[2]], skuloc[1])
+		end
+	end
+	rks
+end
+
+function deXLS(fn)
+	s, l = skuLocationsXLS()
+	r = rackSkus(skulocs)
+	fid = open(fn, "w+")
+	serialize(fid, (s, l, r))
+	close(fid)
+end
 

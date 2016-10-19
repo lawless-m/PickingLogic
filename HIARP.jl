@@ -6,6 +6,32 @@ using DataFrames
 
 login("credentials.jls")
 
+type Stoloc
+	prtnum::AbstractString
+	area::AbstractString
+	stoloc::AbstractString
+	fifo::DateTime
+	case_id::AbstractString
+	qty::Int64
+	descr::AbstractString
+	wh_entry_id::AbstractString
+	Stoloc(p, a, s, f, c, q, d, w) = new(p, a, s, f, c, q, d, w)
+	function Stoloc(df, r)
+		dns(x)=x
+		dns(x::DataArrays.NAtype)=""
+		
+		p = dns(haskey(df, :prtnum) ? df[:prtnum][r] : "")
+		a = dns(haskey(df, :area) ? df[:area][r] : "")
+		s = dns(haskey(df, :stoloc) ? df[:stoloc][r] : "")
+		f = haskey(df, :fifo) ? df[:fifo][r] : DateTime()
+		c = dns(haskey(df, :case_id) ? df[:case_id][r] : "")
+		q = dns(haskey(df, :qty) ? df[:qty][r] : 0)
+		d = dns(haskey(df, :dsc) ? df[:dsc][r] : "")
+		w = dns(haskey(df, :wh_entry_id) ? df[:wh_entry_id][r] : "")
+		new(p, a, s, f, c, q, d, w)
+	end
+end
+
 function inventory()
 	inv = Dict{AbstractString, DataFrame}()
 	for area in ["HWLFTZRH", "HWLFTZRL", "PALR01", "CLDRMST", "BBINA01", "BIN01"]
@@ -42,10 +68,27 @@ function wh_entry_locs(wh_entry_id)
 	qSQL("SELECT * FROM invloc WHERE wh_id='MFTZ' AND inv_attr_str5=@wh_entry_id", [("wh_entry_id", wh_entry_id)])
 end
 
-function LIFOStolocs(prtnums)
+function FIFOStolocsX(prtnums)
 	prts = join(["'$p'" for p in prtnums], ", ")
-	qMoca("[ WITH fifo(prtnum, wh_entry_id, fifodte) AS (SELECT prtnum, inv_attr_str5, max(fifdte) FROM invdtl GROUP BY prtnum, inv_attr_str5)	,	cbi(prtnum, stoloc, wh_entry_id, arecod, untqty) as (SELECT prtnum, stoloc, inv_attr_str5, arecod, untqty from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%' ) SELECT distinct cbi.arecod as area, cbi.prtnum as prtnum, cbi.stoloc as stoloc, cbi.untqty as qty, prtdsc.lngdsc as dsc, fifo.fifodte as dte FROM cbi INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(cbi.prtnum, '|HUS|%') INNER JOIN fifo on fifo.wh_entry_id=cbi.wh_entry_id WHERE fifo.prtnum=cbi.prtnum AND cbi.prtnum IN ($prts) ]")
+	qMoca("[ 
+	WITH 
+		fifo(prtnum, wh_entry_id, fifodte, qty, case_id) AS (SELECT prtnum, inv_attr_str5, fifdte, untqty, subnum FROM invdtl)	
+	,	cbi(prtnum, stoloc, wh_entry_id, arecod, untqty) as (SELECT prtnum, stoloc, inv_attr_str5, arecod, untqty from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%')
+	SELECT distinct cbi.arecod as area, cbi.prtnum as prtnum, cbi.stoloc as stoloc, fifo.qty as qty, prtdsc.lngdsc as dsc, fifo.case_id, fifo.fifodte as fifo 
+	FROM cbi INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(cbi.prtnum, '|HUS|%') INNER JOIN fifo on fifo.wh_entry_id=cbi.wh_entry_id
+	WHERE fifo.prtnum=cbi.prtnum AND cbi.prtnum IN ($prts) ]"
+	)
 end
+
+function FIFOStolocs(prtnums)
+	prts = join(["'$p'" for p in prtnums], ", ")
+	qSQL("
+	SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
+	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
+	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')	
+	AND prtnum IN ($prts)")
+end
+
 
 function rackFPrtnums()
 	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod=@AREA", [("AREA", "BBINA01")]) 
@@ -56,7 +99,7 @@ function orderFreq()
 end
 
 function currentStolocs()
-	qSQL("SELECT distinct CBI.arecod as area, CBI.prtnum as prtnum, CBI.stoloc as stoloc, CBI.untqty as qty, prtdsc.lngdsc as dsc FROM client_blng_inv AS CBI INNER JOIN prtdsc on prtdsc.colval = CONCAT(CBI.prtnum, '|HUS|MFTZ') WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
+	qSQL("SELECT distinct CBI.arecod as area, CBI.prtnum as prtnum, CBI.stoloc as stoloc, CBI.untqty as qty, prtdsc.lngdsc as dsc, inv_attr_str5 as wh_entry_id FROM client_blng_inv AS CBI INNER JOIN prtdsc on prtdsc.colval = CONCAT(CBI.prtnum, '|HUS|MFTZ') WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
 end
 
 
