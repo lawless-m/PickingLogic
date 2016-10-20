@@ -4,6 +4,10 @@ module HIARP
 using RPClient
 using DataFrames
 
+include("utils.jl")
+
+export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums
+
 login("credentials.jls")
 
 type Stoloc
@@ -30,6 +34,24 @@ type Stoloc
 		w = dns(haskey(df, :wh_entry_id) ? df[:wh_entry_id][r] : "")
 		new(p, a, s, f, c, q, d, w)
 	end
+end
+
+function LIFOPick(lods::Vector{Stoloc})
+	domestics = ["89-", "91-", "92-"]
+	pickable = filter((x)->!(x.stoloc[1:3] in domestics), lods)
+	if size(pickable)[1] == 0
+		return
+	end
+	if size(pickable)[1] == 1
+		return pickable[1]
+	end
+	sort!(pickable, lt=(x,y)->x.fifo<y.fifo, rev=true)
+	i = 2
+	while i <= size(pickable)[1] && pickable[i].stoloc == pickable[1].stoloc
+		pickable[1].qty += pickable[i].qty 
+		i += 1
+	end
+	pickable[1]
 end
 
 function inventory()
@@ -80,7 +102,7 @@ function FIFOStolocsX(prtnums)
 	)
 end
 
-function FIFOStolocs(prtnums)
+function FIFOStolocsDF(prtnums)
 	prts = join(["'$p'" for p in prtnums], ", ")
 	qSQL("
 	SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
@@ -89,6 +111,9 @@ function FIFOStolocs(prtnums)
 	AND prtnum IN ($prts)")
 end
 
+function FIFOStolocs(prtnums, k)
+	DictVec(Stoloc, k, FIFOStolocsDF(prtnums))
+end
 
 function rackFPrtnums()
 	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod=@AREA", [("AREA", "BBINA01")]) 
@@ -98,9 +123,12 @@ function orderFreq()
 	qSQL("with ords(prtnum, datum) as (SELECT prtnum , concat(concat(year(entdte), '-'), right(concat('00', month(entdte)), 2)) from ord_line where  client_id='HUS' AND wh_id='MFTZ') select prtnum, count(*) as cnt, datum from ords group by datum, prtnum")
 end
 
-function currentStolocs()
+function currentStolocsDF()
 	qSQL("SELECT distinct CBI.arecod as area, CBI.prtnum as prtnum, CBI.stoloc as stoloc, CBI.untqty as qty, prtdsc.lngdsc as dsc, inv_attr_str5 as wh_entry_id FROM client_blng_inv AS CBI INNER JOIN prtdsc on prtdsc.colval = CONCAT(CBI.prtnum, '|HUS|MFTZ') WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
 end
 
+function currentStolocs()
+	DictVec(Stoloc, :stoloc, currentStolocsDF())
+end
 
 end

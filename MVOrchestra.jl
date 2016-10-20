@@ -10,8 +10,7 @@ MVOrchestra = @deserial("g:/Heinemann/MVOrchestra.jls")
 
 prtnums = map(string, collect(keys(MVOrchestra)))
 
-curr = DictVec(HIARP.Stoloc, :prtnum, HIARP.FIFOStolocs(prtnums))
-
+curr = FIFOStolocs(prtnums, :prtnum)
 
 for prt in prtnums
 	if haskey(curr, prt)

@@ -2,26 +2,13 @@
 cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, abspath("GitHub/PickingLogic/"))
 
-using ExcelReaders
-using Base.Dates
 using HIARP
 
 include("utils.jl")
 
-type Stoloc
-	area::AbstractString
-	prtnum::AbstractString
-	stoloc::AbstractString
-	qty::Int64
-	descr::AbstractString
-	wh_entry_id::AbstractString
-	Stoloc(a, p, s, q, d, w) = new(a, p, s, q, d, w)
-	Stoloc(df, r) = new(df[:area][r], df[:prtnum][r], df[:stoloc][r], df[:qty][r], df[:dsc][r], "")
-end
-
 skulocs, locskus, rackskus = skuLocations()
 
-curr = DictVec(Stoloc, :stoloc, HIARP.currentStolocs())
+curr = currentStolocs()
 
 function procLevel(fid, level, bins)
 	for b in bins
