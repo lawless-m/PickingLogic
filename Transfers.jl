@@ -2,42 +2,29 @@
 cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, abspath("GitHub/PickingLogic/"))
 
+
 using ExcelReaders
 using Base.Dates
 using HIARP
 
 include("utils.jl")
 
+
 i64(a::AbstractString) = a=="TBD" ? -1 : parse(Int64, a)
 
 skulocs, locskus, rackskus = skuLocations()
+locLabels = collect(keys(locskus))
 
+currStolocs = currentStolocs()
+currLabels = collect(keys(currStolocs))
 
-function LIFOPick(lods::Vector{HIARP.Stoloc})
-	domestics = ["89-", "91-", "92-"]
-	pickable = filter((x)->!(x.stoloc[1:3] in domestics), lods)
-	if size(pickable)[1] == 0
-		return
-	end
-	if size(pickable)[1] == 1
-		return pickable[1]
-	end
-	sort!(pickable, lt=(x,y)->x.fifo<y.fifo, rev=true)
-	i = 2
-	while i <= size(pickable)[1] && pickable[i].stoloc == pickable[1].stoloc
-		pickable[1].qty += pickable[i].qty 
-		i += 1
-	end
-	pickable[1]
+function FLabels(racks, bins, levels)
+	[@sprintf("F-%s-%02d-%02d", r, l, b) for r in racks, b in bins, l in levels]
 end
 
-function printLods(fn, rack, lods, curr, levels)
-	@fidA fn for bin in 1:1:8, level in levels
-		label = @sprintf "F-%s-%02d-%02d" rack level bin
-		if haskey(curr, label)
-			continue
-		end
-		if haskey(locskus, label) && haskey(lods, string(locskus[label]))
+function printLods(fid, labels, lods)
+	for label in intersect(locLabels, setdiff(labels, currLabels))
+		if haskey(lods, string(locskus[label]))
 			prtnum = locskus[label]
 			maxqty = skulocs[prtnum][2]
 			lod = LIFOPick(lods[string(prtnum)])
@@ -51,15 +38,14 @@ function printLods(fn, rack, lods, curr, levels)
 	end
 end
 		
-function procRacks(fn, levels)
-	curr = DictVec(HIARP.Stoloc, :stoloc, HIARP.currentStolocs())
+function procRacks(fid, levels)
 	for rack in sort(collect(keys(rackskus)))
-		printLods(fn, rack, DictVec(HIARP.Stoloc, :prtnum, HIARP.FIFOStolocs(rackskus[rack])), curr, levels)
+		printLods(fid, FLabels([rack], 1:8, levels), FIFOStolocs(rackskus[rack], :prtnum))
 	end
 end
 
 function checkRacks()
-	tfd = HIARP.rackFPrtnums()
+	tfd = rackFPrtnums()
 	for r in 1:size(tfd)[1]
 		loc = tfd[:stoloc][r]
 		if haskey(locskus, loc) && string(locskus[loc]) != tfd[:prtnum][r]
@@ -71,13 +57,9 @@ end
 
 j = 1
 if j==1
-	fn = "transfers/ALL-F.txt"
-	close(open("G:/Heinemann/" * fn, "w+"))
-	procRacks(fn, [10:10:90; 91])
+	@fid "transfers/ALL-F.txt" procRacks(fid, [10:10:90; 91])
 elseif j==2
-	fn = "transfers/A-F.txt"
-	close(open("G:/Heinemann/" * fn, "w+"))
-	procRacks(fn, [40 50 60])
+	@fid "transfers/A-F.txt" procRacks(fid, [40 50 60])
 elseif j==3
 	checkRacks(locskus)
 end
