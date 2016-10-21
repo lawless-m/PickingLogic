@@ -23,7 +23,7 @@ function FLabels(racks, bins, levels)
 end
 
 function printLods(fid, labels, lods)
-	for label in intersect(locLabels, setdiff(labels, currLabels))
+	for label in labels
 		if haskey(lods, string(locskus[label]))
 			prtnum = locskus[label]
 			maxqty = skulocs[prtnum][2]
@@ -37,10 +37,18 @@ function printLods(fid, labels, lods)
 		end
 	end
 end
+
+function printBRItems(flt=(k,v)->true)
+	items = filter(flt, HIARP.BRItems())
+	for s in sort(collect(keys(items)))
+		item = items[s][1]
+		@printf "%s\t%d\t(%s)\t%s\n" item.stoloc item.qty item.prtnum item.descr
+	end
+end
 		
 function procRacks(fid, levels)
 	for rack in sort(collect(keys(rackskus)))
-		printLods(fid, FLabels([rack], 1:8, levels), FIFOStolocs(rackskus[rack], :prtnum))
+		printLods(fid, intersect(locLabels, setdiff(FLabels([rack], 1:8, levels), currLabels)), FIFOStolocs(rackskus[rack], :prtnum))
 	end
 end
 
@@ -55,13 +63,34 @@ function checkRacks()
 end
 
 
-j = 1
+j = 4
 if j==1
 	@fid "transfers/ALL-F.txt" procRacks(fid, [10:10:90; 91])
 elseif j==2
 	@fid "transfers/A-F.txt" procRacks(fid, [40 50 60])
 elseif j==3
 	checkRacks(locskus)
+elseif j == 4
+	function testerInNonTestBin(k, v)
+		if v[1].descr[1:2] == "T "		
+			if v[1].stoloc[1] == 'F'
+				return true
+			end
+			if v[1].stoloc[7] == '-'
+				return false
+			end
+			r, l, b =  map(x->parse(Int64,x), split(v[1].stoloc, '-'))
+			if l < 9 && b > 55
+				return false
+			end
+			if b > 25
+				return false
+			end
+			return true
+		end
+		return false			
+	end
+	printBRItems(testerInNonTestBin)
 end
 
 
