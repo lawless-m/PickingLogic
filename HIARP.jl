@@ -6,7 +6,7 @@ using DataFrames
 
 include("utils.jl")
 
-export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums
+export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, pickCounts
 
 login("credentials.jls")
 
@@ -120,22 +120,63 @@ function rackFPrtnums()
 end
 
 function BRItems()
-	DictVec(Stoloc, :stoloc, qSQL("SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
+	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
 	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
 	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')"))
 end
 
+function SKUs()
+	df = qSQL("SELECT DISTINCT prtnum, prtdsc.lngdsc AS dsc FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')")
+	dct = Dict{AbstractString, AbstractString}()
+	for k in 1:size(df)[1]
+		dct[df[:prtnum][k]] = df[:dsc][k]
+	end
+	dct
+end
 
 function orderFreq()
 	qSQL("with ords(prtnum, datum) as (SELECT prtnum , concat(concat(year(entdte), '-'), right(concat('00', month(entdte)), 2)) from ord_line where  client_id='HUS' AND wh_id='MFTZ') select prtnum, count(*) as cnt, datum from ords group by datum, prtnum")
 end
 
 function currentStolocsDF()
-	qSQL("SELECT distinct CBI.arecod as area, CBI.prtnum as prtnum, CBI.stoloc as stoloc, CBI.untqty as qty, prtdsc.lngdsc as dsc, inv_attr_str5 as wh_entry_id FROM client_blng_inv AS CBI INNER JOIN prtdsc on prtdsc.colval = CONCAT(CBI.prtnum, '|HUS|MFTZ') WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
+	qSQL("SELECT distinct CBI.arecod as area, CBI.prtnum as prtnum, CBI.stoloc as stoloc, CBI.untqty as qty, prtdsc.lngdsc as dsc, inv_attr_str5 as wh_entry_id 
+	FROM client_blng_inv AS CBI INNER JOIN prtdsc on prtdsc.colval = CONCAT(CBI.prtnum, '|HUS|MFTZ') 
+	WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
 end
 
 function currentStolocs()
 	DictVec(Stoloc, :stoloc, currentStolocsDF())
 end
 
+function ordersPrtnumList()
+	qSQL("SELECT DISTINCT ord_line.prtnum as prtnum 
+	FROM ord LEFT JOIN ord_line ON ord.ordnum = ord_line.ordnum 
+	WHERE ord.client_id='HUS' AND ord.wh_id='MFTZ'")[:prtnum]
 end
+
+function orderNumbers()
+	qSQL("SELECT ordnum 
+	FROM ord 
+	WHERE client_id='HUS' AND wh_id='MFTZ'")[:ordnum]
+end
+
+function orderLinePrtnums(onum)
+	qSQL("SELECT prtnum FROM ord_line
+	WHERE ord_num=@ORDNUM", [("ORDNUM", onum)])
+end
+
+function pickCounts()
+	@dictCols(qSQL("SELECT prtnum, COUNT(prtnum) AS cnt 
+	FROM ord LEFT JOIN ord_line ON ord.ordnum = ord_line.ordnum
+	WHERE ord.client_id='HUS' AND ord.wh_id='MFTZ'
+	GROUP BY prtnum"), :prtnum, :cnt)
+end
+
+
+
+
+
+# STAAHHHPPPP
+
+end
+

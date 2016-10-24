@@ -118,12 +118,22 @@ function i64(sql::AbstractString, col)
 	@denull(Int64, SQLite.query(DB, sql), col)
 end
 
-macro dictCols(sql, ks, vs) # create dictionary, one column as keys, one as values
+macro dictColsSQL(sql, ks, vs) # create dictionary, one column as keys, one as values
 	return quote
 		data = SQLite.query(DB, $sql)
 		dct = Dict{eltype(data[$ks][1]), eltype(data[$vs][1])}()
 		for k in 1:size(data)[1]
 			dct[Base.get(data[$ks][k])] = isnull(data[$vs][k]) ? "" : Base.get(data[$vs][k])
+		end
+		dct
+	end
+end
+
+macro dictCols(df, ks, vs) # create dictionary, one column as keys, one as values
+	return quote
+		dct = Dict{eltype(df[$ks][1]), eltype(df[$vs][1])}()
+		for k in 1:size(df)[1]
+			dct[df[$ks][k]] = df[$vs][k]
 		end
 		dct
 	end

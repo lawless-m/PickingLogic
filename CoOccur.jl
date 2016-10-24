@@ -25,8 +25,7 @@ http://clusteringjl.readthedocs.io/en/latest/kmeans.html
 
 =#
 module CoOccur
-
-using HIADB
+using HIARP
 using Clustering
 using MultivariateStats
 
@@ -35,8 +34,8 @@ macro vsort(d) # dictionary keys sorted by the values
 end
 
 function fillOccurrences!()
-	for o in HIADB.orderNumbers()
-		partnums = HIADB.partnumsInLocationPerOrder(o)
+	for o in orderNumbers()
+		partnums = orderLinePrtnums()
 		for i in 1:size(partnums)[1]
 			p = searchsorted(PARTS, partnums[i])
 			for k in i+1:size(partnums)[1]
@@ -129,9 +128,9 @@ function clusterize(k)
 end
 
 
-const PARTS = HIADB.partnumsInOrders()
+const PARTS = ordersPrtnumList()
 const NUMPARTS = size(PARTS)[1]
-const VELOCITIES = HIADB.partVelocities()
+const VELOCITIES = pickCounts()
 const OCCURRENCE = zeros(Float32, NUMPARTS, NUMPARTS) 
 export fillOccurrences!, clusterize, kclusters, clusterVelocities, printSortedClusters
 
