@@ -6,7 +6,7 @@ using DataFrames
 
 include("utils.jl")
 
-export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, pickCounts
+export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, pickCounts, SKUs
 
 login("credentials.jls")
 
@@ -126,16 +126,42 @@ function BRItems()
 end
 
 function SKUs()
-	df = qSQL("SELECT DISTINCT prtnum, prtdsc.lngdsc AS dsc FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')")
+	df = qSQL("SELECT DISTINCT prtnum, prtdsc.lngdsc AS dsc FROM inventory_view INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')")
 	dct = Dict{AbstractString, AbstractString}()
 	for k in 1:size(df)[1]
 		dct[df[:prtnum][k]] = df[:dsc][k]
 	end
-	dct
+	return dct
 end
 
 function orderFreq()
-	qSQL("with ords(prtnum, datum) as (SELECT prtnum , concat(concat(year(entdte), '-'), right(concat('00', month(entdte)), 2)) from ord_line where  client_id='HUS' AND wh_id='MFTZ') select prtnum, count(*) as cnt, datum from ords group by datum, prtnum")
+	df = qSQL("SELECT prtnum, COUNT(prtnum) AS cnt 
+	FROM ord LEFT JOIN ord_line ON ord.ordnum = ord_line.ordnum
+	WHERE ord.client_id='HUS' AND ord.wh_id='MFTZ'
+	GROUP BY prtnum")
+	dct = Dict{AbstractString, Int64}()
+	for k in 1:size(df)[1]
+		dct[df[:prtnum][k]] = df[:cnt][k]
+	end
+	return dct
+end
+
+function orderFreqByMonth()
+	qSQL("
+		WITH ords(prtnum, datum) AS (
+			SELECT prtnum , CONCAT(CONCAT(YEAR(entdte), '-'), RIGHT(CONCAT('00', MONTH(entdte)), 2)) 
+			FROM ord_line 
+			WHERE  client_id='HUS' AND wh_id='MFTZ')
+		SELECT prtnum, COUNT(*) AS cnt, datum FROM ords GROUP BY prtnum, datum")
+end
+
+function orderFreqByQtr()
+	qSQL("
+		WITH ords(prtnum, qtr) AS (
+			SELECT prtnum, CONCAT(CONCAT(year(entdte), '-Q'), 1+MONTH(entdte)/4)
+			FROM ord_line
+			WHERE  client_id='HUS' AND wh_id='MFTZ')
+		SELECT prtnum, COUNT(*) AS cnt, qtr FROM ords GROUP BY prtnum, qtr")
 end
 
 function currentStolocsDF()
@@ -164,15 +190,6 @@ function orderLinePrtnums(onum)
 	qSQL("SELECT prtnum FROM ord_line
 	WHERE ord_num=@ORDNUM", [("ORDNUM", onum)])
 end
-
-function pickCounts()
-	@dictCols(qSQL("SELECT prtnum, COUNT(prtnum) AS cnt 
-	FROM ord LEFT JOIN ord_line ON ord.ordnum = ord_line.ordnum
-	WHERE ord.client_id='HUS' AND ord.wh_id='MFTZ'
-	GROUP BY prtnum"), :prtnum, :cnt)
-end
-
-
 
 
 

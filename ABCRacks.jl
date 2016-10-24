@@ -2,16 +2,19 @@
 cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, "GitHub/PickingLogic/")
 
-using HIADB
+error("different locs re-write needed, abort")
+
+#using HIADB
+using DataFrames
+using HIARP
 
 include("utils.jl")
 
-type Velq 
-	year::Int64
-	quarter::Int64
+type Velq
+	qtr::AbstractString
 	count::Int64
-	Velq(y::Int64, q::Int64, c::Int64) = new(y, q, c)
-	Velq(df, r) = new(get(df[:yr][r]), get(df[:qtr][r]), get(df[:cnt][r]))
+	Velq(q::AbstractString, c::Int64) = new(q, c)
+	Velq(df::DataFrame, r::Int64) = new(df[:qtr][r], df[:cnt][r])
 end
 
 type SkuStore
@@ -21,23 +24,23 @@ type SkuStore
 	SkuStore(df, r) = new(get(df[:stoloc][r]), get(df[:qty][r]))
 end
 
-const SKUs = HIADB.SKUs()
-const Prtnums = collect(keys(SKUs))
-const PickCountsByQtr = i64DictVec(Velq, :prtnum, HIADB.pickCountsByQtr()) # prtnum => Vector{.year .quarter .count}
-const PickCounts = HIADB.pickCounts() # prtnum => pickCount
-const SkuStorage = i64DictVec(SkuStore, :prtnum, HIADB.SKUsInStorage())# prtnum => Vector{.stoloc .qty}
-const LocSkus = begin
-		ls = Dict{AbstractString, Int64}()
-		for p in collect(keys(SkuStorage)), l in SkuStorage[p]
-			ls[l.stoloc] = p
-		end
-		ls
-	end
+
+skulocs, locskus, rackskus = skuLocations()
+locLabels = collect(keys(locskus))
+
+currStolocs = currentStolocs()
+currLabels = collect(keys(currStolocs))
+
+const skus = SKUs()
+const Prtnums = collect(keys(skus))
+const PickCountsByQtr = DictVec(Velq, :prtnum, HIARP.orderFreqByQtr()) # prtnum => Vector{.qtr .count}
+const PickCounts = HIARP.orderFreq() # prtnum => pickCount
 
 pickCount(k) = haskey(PickCounts, k) ? PickCounts[k] : 0
 
+
 const Ranks = begin
-		ranks = Dict{Int64, Int64}() # prtnum => rank
+		ranks = Dict{AbstractString, Int64}() # prtnum => rank
 		rank=0
 		for vrank in sortperm(Prtnums, lt=(a, b)->pickCount(a)<pickCount(b), rev=true)
 			rank += 1
@@ -53,8 +56,10 @@ const Racks = begin
 		end
 		r
 	end
+
+
 	
-const LocRank =  Dict{AbstractString, Int64}([loc => haskey(LocSkus, loc) ? Ranks[LocSkus[loc]] : 0 for loc in Racks])
+const LocRank =  Dict{AbstractString, Int64}([loc => haskey(locskus, loc) ? Ranks[locskus[loc]] : 0 for loc in Racks])
 
 function printQtrs()
 	#=
@@ -62,21 +67,21 @@ function printQtrs()
 	=#
 	@fid("g:/Heinemann/abc.txt", 
 		for vrank in 1:size(Prtnums)[1]
-			@printf fid "P%d\tPicks:%d\t%s\n" Ranks[Prtnums[vrank]] PickCounts[Prtnums[vrank]] SKUs[Prtnums[vrank]]
+			@printf fid "P%d\tPicks:%d\t%s\n" Ranks[Prtnums[vrank]] PickCounts[Prtnums[vrank]] skus[Prtnums[vrank]]
 			for v in PickCountsByQtr[Prtnums[vrank]]
-				@printf fid "\t%d/%d\t%d\n" v.year v.quarter v.count
+				@printf fid "\t%s\t%d\n" v.qtr v.count
 			end
 		end
 	)
 end
 
-function printRankLocs()
+function printRankLocs(fid)
 	#=
 		print locations and various ranks
 	=#
-	@fid "g:/Heinemann/stoloc_visits.txt" for loc in sort(Racks)
+	for loc in sort(Racks)
 		if LocRank[loc] > 0
-			@printf fid "%s - Visits:%#2d - %s (%#2.2f)\n" loc pickCount(LocSkus[loc]) @class(LocRank[loc]) 100LocRank[loc]/size(Prtnums)[1]
+			@printf fid "%s - Visits:%#2d - %s (%#2.2f)\n" loc pickCount(locskus[loc]) @class(LocRank[loc]) 100LocRank[loc]/size(Prtnums)[1]
 		else
 			@printf fid "%s - noSKU\n" loc
 		end
@@ -86,14 +91,14 @@ end
 function pickCountFreqs()
 	maxCnt = max(collect(values(PickCounts))...)
 	pickFreqs = zeros(Int64, maxCnt+1) # [freq+1]=count
-	for prtnum in collect(keys(SKUs))
+	for prtnum in collect(keys(skus))
 		pickFreqs[pickCount(prtnum)+1] += 1
 	end
 	pickFreqs
 end
 
-function printPickCountFreqs(pickFreqs) # for barchart
-	@fid "g:/Heinemann/pickCountFreqs.txt"	begin
+function printPickCountFreqs(fid, pickFreqs) # for barchart
+	begin
 		@printf fid "Freq\tCount\n"
 		for cnt in 1:size(pickFreqs)[1]
 			@printf fid "%d\t%d\n" cnt-1 pickFreqs[cnt]
@@ -101,18 +106,21 @@ function printPickCountFreqs(pickFreqs) # for barchart
 	end
 end
 
-function rankRacks()
+function rankRacks(fid)
 	shelves = Dict{AbstractString, Int64}()
 	for rack in 1:19, level in 10:10:60
 		shelves[@sprintf "%02d-%02d" rack level] = sum([LocRank[@sprintf "%02d-%02d-%02d" rack level bin] for bin in 1:60])
 	end
 	sortshelf = collect(keys(shelves))
-	@fid "g:/Heinemann/shelfRanks.txt" for shelf in sortperm(sortshelf, lt=(a, b)->shelves[a]<shelves[b])
+	for shelf in sortperm(sortshelf, lt=(a, b)->shelves[a]<shelves[b])
 		@printf fid "%s\t%d\n" sortshelf[shelf] shelves[sortshelf[shelf]]
 	end
 end
 
-printRankLocs()
-rankRacks()
+
+
+#@fid "g:/Heinemann/pickCountFreqs.txt" printPickCountFreqs(fid, pickCountFreqs())
+@fid "stoloc_visits.txt" printRankLocs(fid)
+#@fid "g:/Heinemann/shelfRanks.txt" rankRacks(fid)
 
 

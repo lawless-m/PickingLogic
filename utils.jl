@@ -131,9 +131,9 @@ end
 
 macro dictCols(df, ks, vs) # create dictionary, one column as keys, one as values
 	return quote
-		dct = Dict{eltype(df[$ks][1]), eltype(df[$vs][1])}()
-		for k in 1:size(df)[1]
-			dct[df[$ks][k]] = df[$vs][k]
+		dct = Dict{eltype($df[$ks]), eltype($df[$vs])}()
+		for k in 1:size($df)[1]
+			dct[$df[$ks][k]] = $df[$vs][k]
 		end
 		dct
 	end
@@ -146,6 +146,7 @@ macro serialize(fn, v)
 		close(fid)
 	end
 end
+
 macro deserial(fn)
 	return quote
 		fid = open($fn, "r+")

@@ -1,31 +1,20 @@
+cd(ENV["USERPROFILE"] * "/Documents")
+unshift!(LOAD_PATH, "GitHub/PickingLogic/")
 
-type ST
-	stoloc::AbstractString
-	descr::AbstractString
+#using HIADB
+using DataFrames
+using HIARP
+
+include("utils.jl")
+
+println("Get DF")
+df = HIARP.RPClient.qSQL("SELECT DISTINCT prtnum, prtdsc.lngdsc AS dsc FROM inventory_view INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')")
+
+println("loop")
+dct = Dict{AbstractString, AbstractString}()
+for k in 1:size(df)[1]
+	dct[df[:prtnum][k]] = df[:dsc][k]
 end
 
 
-tt = Dict{Int64, Vector{ST}}(1=>[ST("10-100-10", "T test100")], 2=>[ST("18-20-22", "T YSL Paris L0074300 EDPS")], 3=>[ST("F-01-01-01", "NormalF")], 4=>[ST("10-100-10", "Exist?")])
 
-
-	function testerInNonTestBin(k, v)
-		if v[1].stoloc[1] == 'F'
-			println("F ", v[1])
-			return false
-		end
-		if v[1].descr[1:2] == "T "
-			if v[1].stoloc[7] == '-'
-				println("- ", v[1])
-				return false
-			end
-			println("T ", v[1])
-			return true
-		end
-		println("N ", v[1])
-		return false			
-	end
-	
-	println(filter(testerInNonTestBin, tt))
-	
-	
-	
