@@ -38,11 +38,31 @@ function printLods(fid, labels, lods)
 	end
 end
 
-function printBRItems(flt=(k,v)->true)
+function testerInNonTestBin(k, v)
+	if v[1].descr[1:2] == "T "		
+		if v[1].stoloc[1] == 'F'
+			return true
+		end
+		if v[1].stoloc[7] == '-'
+			return false
+		end
+		r, l, b =  map(x->parse(Int64,x), split(v[1].stoloc, '-'))
+		if l < 9 && b > 55
+			return false
+		end
+		if b > 25
+			return false
+		end
+		return true
+	end
+	return false			
+end
+
+function printBRItems(fid, flt=(k,v)->true)
 	items = filter(flt, HIARP.BRItems())
 	for s in sort(collect(keys(items)))
 		item = items[s][1]
-		@printf "%s\t%d\t(%s)\t%s\n" item.stoloc item.qty item.prtnum item.descr
+		@printf fid "%s\t%d\t(%s)\t%s\n" item.stoloc item.qty item.prtnum item.descr
 	end
 end
 		
@@ -71,26 +91,7 @@ elseif j==2
 elseif j==3
 	checkRacks(locskus)
 elseif j == 4
-	function testerInNonTestBin(k, v)
-		if v[1].descr[1:2] == "T "		
-			if v[1].stoloc[1] == 'F'
-				return true
-			end
-			if v[1].stoloc[7] == '-'
-				return false
-			end
-			r, l, b =  map(x->parse(Int64,x), split(v[1].stoloc, '-'))
-			if l < 9 && b > 55
-				return false
-			end
-			if b > 25
-				return false
-			end
-			return true
-		end
-		return false			
-	end
-	printBRItems(testerInNonTestBin)
+	@fid "transfers/Testers.txt"	printBRItems(fid, testerInNonTestBin)
 end
 
 
