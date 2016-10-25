@@ -6,7 +6,7 @@ using DataFrames
 
 include("utils.jl")
 
-export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, pickCounts, SKUs
+export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs
 
 login("credentials.jls")
 
@@ -134,7 +134,7 @@ function SKUs()
 	return dct
 end
 
-function orderFreq()
+function prtnumOrderFreq()
 	df = qSQL("SELECT prtnum, COUNT(prtnum) AS cnt 
 	FROM ord LEFT JOIN ord_line ON ord.ordnum = ord_line.ordnum
 	WHERE ord.client_id='HUS' AND ord.wh_id='MFTZ'
@@ -175,20 +175,20 @@ function currentStolocs()
 end
 
 function ordersPrtnumList()
-	qSQL("SELECT DISTINCT ord_line.prtnum as prtnum 
+	collect(qSQL("SELECT DISTINCT ord_line.prtnum as prtnum 
 	FROM ord LEFT JOIN ord_line ON ord.ordnum = ord_line.ordnum 
-	WHERE ord.client_id='HUS' AND ord.wh_id='MFTZ'")[:prtnum]
+	WHERE ord.client_id='HUS' AND ord.wh_id='MFTZ'")[:prtnum])
 end
 
 function orderNumbers()
-	qSQL("SELECT ordnum 
+	collect(qSQL("SELECT ordnum 
 	FROM ord 
-	WHERE client_id='HUS' AND wh_id='MFTZ'")[:ordnum]
+	WHERE client_id='HUS' AND wh_id='MFTZ'")[:ordnum])
 end
 
 function orderLinePrtnums(onum)
-	qSQL("SELECT prtnum FROM ord_line
-	WHERE ord_num=@ORDNUM", [("ORDNUM", onum)])
+	collect(qSQL("SELECT prtnum FROM ord_line
+	WHERE ordnum=@ORDNUM", [("ORDNUM", onum)])[:prtnum])
 end
 
 

@@ -35,7 +35,7 @@ end
 
 function fillOccurrences!()
 	for o in orderNumbers()
-		partnums = orderLinePrtnums()
+		partnums = orderLinePrtnums(o)
 		for i in 1:size(partnums)[1]
 			p = searchsorted(PARTS, partnums[i])
 			for k in i+1:size(partnums)[1]
@@ -52,7 +52,7 @@ function reduceDim(dims)
 end
 
 function kclusters(k)
-	cs = Vector{Vector{Int64}}(k)
+	cs = Vector{Vector{AbstractString}}(k)
 	R = kmeans(OCCURRENCE, k; maxiter=200)
 	A = assignments(R)
 	for i in 1:k
@@ -127,10 +127,19 @@ function clusterize(k)
 	clusters, clusterVelocities(clusters)
 end
 
+function loadOccurrences!(fn)
+	fid = open($fn, "r+")
+	v = deserialize(fid)
+	close(fid)
+	for i = 1:size(v)[1], j = 1:size(v)[2]
+		OCCURRENCE[i, j]  = v[i,j]
+	end
+end
 
-const PARTS = ordersPrtnumList()
+
+const PARTS = collect(ordersPrtnumList())
 const NUMPARTS = size(PARTS)[1]
-const VELOCITIES = pickCounts()
+const VELOCITIES = prtnumOrderFreq()
 const OCCURRENCE = zeros(Float32, NUMPARTS, NUMPARTS) 
 export fillOccurrences!, clusterize, kclusters, clusterVelocities, printSortedClusters
 

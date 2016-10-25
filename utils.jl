@@ -139,15 +139,15 @@ macro dictCols(df, ks, vs) # create dictionary, one column as keys, one as value
 	end
 end
 
-macro serialize(fn, v)
+macro serialise(fn, v)
 	return quote
 		fid = open($fn, "w+")
-		serialize(fod, $v)
+		serialize(fid, $v)
 		close(fid)
 	end
 end
 
-macro deserial(fn)
+macro deserialise(fn)
 	return quote
 		fid = open($fn, "r+")
 		v = deserialize(fid)
