@@ -19,7 +19,7 @@ currStolocs = currentStolocs()
 currLabels = collect(keys(currStolocs))
 
 function FLabels(racks, bins, levels)
-	[@sprintf("F-%s-%02d-%02d", r, l, b) for r in racks, b in bins, l in levels]
+	[@sprintf("F-%02d-%02d-%02d", r, l, b) for r in racks, b in bins, l in levels]
 end
 
 function BLabels()
@@ -141,8 +141,10 @@ elseif j==5
 elseif j==6
 	d = Dates.format(today(), "u_d")
 	@fid "transfers/Status_Chanel_$d.txt" bakerStatus(fid, chanelLabels())
-
+elseif j==7
+	d = Dates.format(today(), "u_d")
+	@fid "transfers/Status_F-A_$d.txt" bakerStatus(fid, vec(FLabels(1:81, 1:8, [40; 50 ;60])))
+elseif j==8
+	@fid "transfers/Wrong_items.txt" checkRacks()
 end
-
-
 

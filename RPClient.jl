@@ -1,4 +1,5 @@
 
+
 module RPClient
 
 export login, qMoca, qSQL, columns
@@ -65,6 +66,7 @@ function fillDF(res)
 end
 
 function postMOCA(xml)
+	# @printf STDERR "%s\n" xml
 	r = Requests.post(CREDENTIALS["host"]*(CREDENTIALS["id"] == "" ? "service" : "service?msession=" * CREDENTIALS["id"]); headers = Dict("Content-Type" => "application/moca-xml", "Response-Encoder" => "xml"), data=xml)
 	xml = parse_string(readall(r))
 	els = get_elements_by_tagname(root(xml), "session-id")
@@ -110,13 +112,17 @@ macro var(r, n, v)
 	end
 end
 
+attType(n::Integer) = "INTEGER"
+attType(n::Real) = "FLOAT"
+attType(n) = "STRING"
+
 macro field(r, n, v)
 	return quote
 		f = new_child($r, "field")
 		set_attribute(f, "name", $n)
-		set_attribute(f, "type", "STRING")
+		set_attribute(f, "type", attType($v))
 		set_attribute(f, "oper", "EQ")
-		add_text(f, $v)
+		add_text(f, string($v))
 	end
 end
 
@@ -165,6 +171,7 @@ end
 function columns(tbl)
 	qMoca("[ SELECT * from $tbl WHERE 1=0]")
 end
+
 
 
 end

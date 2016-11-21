@@ -1,12 +1,14 @@
 
+
 module HIARP
 
+import Base.show
 using RPClient
 using DataFrames
 
 include("utils.jl")
 
-export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs
+export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode
 
 login("credentials.jls")
 
@@ -34,6 +36,10 @@ type Stoloc
 		w = dns(haskey(df, :wh_entry_id) ? df[:wh_entry_id][r] : "")
 		new(p, a, s, f, c, q, d, w)
 	end
+end
+
+function show(io::IO, s::Stoloc)
+	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d descr:%s wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.descr s.wh_entry_id
 end
 
 function LIFOPick(lods::Vector{Stoloc})
@@ -76,6 +82,14 @@ function inventory()
 		end
 	end
 	inv
+end
+
+function item(prtnum)
+	qMoca("list parts WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id='----'", [("prtnum", prtnum)])
+end
+
+function typeCode(prtnum)
+	qSQL("SELECT typcod from prtmst WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id='----'", [("prtnum", prtnum)])[:typcod][1]
 end
 
 function prtnum_stoloc_wh_entry_id()
@@ -191,6 +205,9 @@ function orderLinePrtnums(onum)
 	WHERE ordnum=@ORDNUM", [("ORDNUM", onum)])[:prtnum])
 end
 
+function prevOrders(prtnum, cnt=5)
+	collect(qSQL("SELECT entdte as datum FROM ord_line WHERE prtnum=@PRTNUM AND rownum<=@CNT ORDER BY entdte DESC", [("PRTNUM", prtnum), ("CNT", cnt)])[:datum])
+end
 
 
 # STAAHHHPPPP

@@ -27,6 +27,17 @@ function sheet(sht)
 	@sheet(sht*".xls", sht)
 end
 
+macro Xls(fn, blk)
+	return quote
+		if $fn[2] == ":"
+			xls = Workbook($fn * ".xlsx")
+		else
+			xls = Workbook("G:/Heinemann/" * $fn * ".xlsx")
+		end
+		$blk
+		close_workbook(xls)
+	end
+end
 
 macro fid(fn, blk)
 	return quote
