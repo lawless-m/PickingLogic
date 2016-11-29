@@ -89,7 +89,7 @@ function item(prtnum)
 end
 
 function typeCode(prtnum)
-	qSQL("SELECT typcod from prtmst WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id='----'", [("prtnum", prtnum)])[:typcod][1]
+	qSQL("SELECT typcod from prtmst WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id_tmpl='----'", [("prtnum", prtnum)])[:typcod][1]
 end
 
 function prtnum_stoloc_wh_entry_id()

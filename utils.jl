@@ -35,7 +35,7 @@ macro Xls(fn, blk)
 			xls = Workbook("G:/Heinemann/" * $fn * ".xlsx")
 		end
 		$blk
-		close_workbook(xls)
+		close(xls)
 	end
 end
 
