@@ -1,3 +1,14 @@
+#=
+
+sort by date then part number, remove duplicate part numbers
+
+charge 1 put away for each line item with case qty - charge $5.48
+
+
+
+=#
+
+
 
 cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, "GitHub/PickingLogic/")
@@ -18,8 +29,8 @@ function byPrtMonth(yr, mn)
 		")
 end
 
-@fid "prtmonth.df" begin
-	df = byPrtMonth("2016", "10")
+@fid "prtmonth_nov_16" begin
+	df = byPrtMonth("2016", "11")
 	for r in 1:size(df)[1]
 		@printf fid "%s\t%s\t%d\t%d\n" df[:dy][r] df[:prtnum][r] df[:untqty][r] df[:untcas][r]
 	end

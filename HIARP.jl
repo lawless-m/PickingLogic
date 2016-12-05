@@ -8,7 +8,7 @@ using DataFrames
 
 include("utils.jl")
 
-export LIFOPick, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode
+export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS
 
 login("credentials.jls")
 
@@ -42,22 +42,18 @@ function show(io::IO, s::Stoloc)
 	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d descr:%s wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.descr s.wh_entry_id
 end
 
-function LIFOPick(lods::Vector{Stoloc})
+function FIFOSort(lods::Vector{Stoloc})
 	domestics = ["89-", "91-", "92-"]
 	pickable = filter((x)->!(x.stoloc[1:3] in domestics), lods)
-	if size(pickable)[1] == 0
-		return
+	sort!(pickable, lt=(x,y)->x.fifo<y.fifo)
+	for i = 2:size(pickable, 1)
+		if pickable[i].stoloc == pickable[1].stoloc
+			pickable[1].qty += pickable[i].qty 
+		else
+			break
+		end
 	end
-	if size(pickable)[1] == 1
-		return pickable[1]
-	end
-	sort!(pickable, lt=(x,y)->x.fifo<y.fifo, rev=true)
-	i = 2
-	while i <= size(pickable)[1] && pickable[i].stoloc == pickable[1].stoloc
-		pickable[1].qty += pickable[i].qty 
-		i += 1
-	end
-	pickable[1]
+	pickable
 end
 
 function inventory()
@@ -207,6 +203,10 @@ end
 
 function prevOrders(prtnum, cnt=5)
 	collect(qSQL("SELECT entdte as datum FROM ord_line WHERE prtnum=@PRTNUM AND rownum<=@CNT ORDER BY entdte DESC", [("PRTNUM", prtnum), ("CNT", cnt)])[:datum])
+end
+
+function stolocsHUS()
+	collect(qSQL("select distinct stoloc from locmst where (wh_id ='MIA' or wh_id='MFTZ')")[:stoloc])
 end
 
 

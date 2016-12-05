@@ -50,7 +50,7 @@ function printLods(fid, labels, lods)
 		if haskey(lods, string(locskus[label]))
 			prtnum = locskus[label]
 			maxqty = skulocs[prtnum][2]
-			lod = LIFOPick(lods[string(prtnum)])
+			lod = FIFOPick(lods[string(prtnum)])
 			if lod == nothing
 				lod = lods[string(prtnum)][1]
 				@printf fid "%s\t%s\tqty:%d\tMax:%d\t(%s) %s\r\n" label "DOMESTIC" 0 maxqty prtnum lod.descr
@@ -126,7 +126,7 @@ function bakerStatus(fid, labels)
 	@printf fid "Empty: %d / %d = %d%%\n" empty exist round(100empty/exist)
 end
 
-j = 5
+j = 8
 if j==1
 	@fid "transfers/ALL-F.txt" procRacks(fid, [10:10:90; 91])
 elseif j==2

@@ -175,7 +175,13 @@ function skuLocations()
 	fid = open(skfn, "r")
 	(s, l, r) = deserialize(fid)
 	close(fid)
+	# (sku=>(fixed locations, qty),  loc=>sku, rack => [skus])
 	s, l, r
+end
+
+function fixedLocations()
+	s, l, r = skuLocations()
+	s, Dict{AbstractString, AbstractString}([k=>string(v) for (k,v ) in l]), r
 end
 
 function skuLocationsXLS()
