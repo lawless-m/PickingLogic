@@ -1,22 +1,12 @@
-#=
-
-sort by date then part number, remove duplicate part numbers
-
-charge 1 put away for each line item with case qty - charge $5.48
-
-
-
-=#
-
-
-
 cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, "GitHub/PickingLogic/")
+unshift!(LOAD_PATH, "GitHub/XlsxWriter.jl/")
 
 include("utils.jl")
 
 using HIARP
-
+using XlsxWriter
+using Base.Dates
 
 function byPrtMonth(yr, mn)
 	RPClient.qSQL("
@@ -29,13 +19,21 @@ function byPrtMonth(yr, mn)
 		")
 end
 
-@fid "prtmonth_nov_16" begin
-	df = byPrtMonth("2016", "11")
-	for r in 1:size(df)[1]
-		@printf fid "%s\t%s\t%d\t%d\n" df[:dy][r] df[:prtnum][r] df[:untqty][r] df[:untcas][r]
+
+@Xls "prtmonths" begin
+	for m in ["08" "09" "10" "11"]
+		ws = add_worksheet!(xls, m)
+		df = byPrtMonth("2016", m)
+		for r in 1:size(df)[1]
+			write!(ws, r, 1, df[:dy][r])
+			write!(ws, r, 2, df[:prtnum][r])
+			write!(ws, r, 3, df[:untqty][r])
+			write!(ws, r, 4, df[:untcas][r])
+		end
 	end
 end
 
+println("done")
 
 
  
