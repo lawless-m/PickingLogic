@@ -8,7 +8,7 @@ using DataFrames
 
 include("utils.jl")
 
-export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS
+export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes
 
 login("credentials.jls")
 
@@ -21,7 +21,9 @@ type Stoloc
 	qty::Int64
 	descr::AbstractString
 	wh_entry_id::AbstractString
-	Stoloc(p, a, s, f, c, q, d, w) = new(p, a, s, f, c, q, d, w)
+	typcod::AbstractString
+	# don't forget to change show if you change this
+	Stoloc(p, a, s, f, c, q, d, w, t) = new(p, a, s, f, c, q, d, w, t)
 	function Stoloc(df, r)
 		dns(x)=x
 		dns(x::DataArrays.NAtype)=""
@@ -34,12 +36,26 @@ type Stoloc
 		q = dns(haskey(df, :qty) ? df[:qty][r] : 0)
 		d = dns(haskey(df, :dsc) ? df[:dsc][r] : "")
 		w = dns(haskey(df, :wh_entry_id) ? df[:wh_entry_id][r] : "")
-		new(p, a, s, f, c, q, d, w)
+		t = dns(haskey(df, :typcod) ? df[:typcod][r] : "")
+		new(p, a, s, f, c, q, d, w, t)
 	end
 end
 
 function show(io::IO, s::Stoloc)
-	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d descr:%s wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.descr s.wh_entry_id
+	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d descr:%s wh_entry_id:%s typcod:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.descr s.wh_entry_id s.typcod
+end
+
+macro commas(a)
+	:(join(["'$p'" for p in $a], ", "))
+end
+
+macro logCmd(blk)
+	quote
+		setLog(true)
+		v = $blk
+		setLog(false)
+		return v
+	end
 end
 
 function FIFOSort(lods::Vector{Stoloc})
@@ -88,6 +104,12 @@ function typeCode(prtnum)
 	qSQL("SELECT typcod from prtmst WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id_tmpl='----'", [("prtnum", prtnum)])[:typcod][1]
 end
 
+function typeCodes(prtnums)
+	df = qSQL("SELECT prtnum, typcod from prtmst WHERE prtnum in (" * @commas(prtnums) * ") AND prt_client_id ='HUS' AND wh_id_tmpl='----'")
+	@dictCols(df, :prtnum, :typcod)
+end
+
+
 function prtnum_stoloc_wh_entry_id()
 	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod in ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')")
 end
@@ -113,12 +135,11 @@ function FIFOStolocsX(prtnums)
 end
 
 function FIFOStolocsDF(prtnums)
-	prts = join(["'$p'" for p in prtnums], ", ")
 	qSQL("
 	SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
 	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
 	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')	
-	AND prtnum IN ($prts)")
+	AND prtnum IN (" * @commas(prtnums) * ")")
 end
 
 function FIFOStolocs(prtnums, k)

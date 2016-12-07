@@ -2,7 +2,7 @@
 
 module RPClient
 
-export login, qMoca, qSQL, columns
+export login, qMoca, qSQL, columns, setLog
 
 const CREDENTIALS = Dict{AbstractString, AbstractString}("host"=>"", "un"=>"", "pw"=>"", "id"=>"", "key"=>"")
 
@@ -10,6 +10,12 @@ using LightXML
 using Requests
 using DataFrames
 using Base.Dates
+
+logMoca = false
+
+function setLog(b::Bool)
+	global logMoca = b
+end
 
 function parseDate(txt)
 	y = parse(Int64, txt[1:4])
@@ -66,7 +72,9 @@ function fillDF(res)
 end
 
 function postMOCA(xml)
-	# @printf STDERR "%s\n" xml
+	if logMoca == true
+		@printf STDERR "%s\n" xml
+	end
 	r = Requests.post(CREDENTIALS["host"]*(CREDENTIALS["id"] == "" ? "service" : "service?msession=" * CREDENTIALS["id"]); headers = Dict("Content-Type" => "application/moca-xml", "Response-Encoder" => "xml"), data=xml)
 	xml = parse_string(readall(r))
 	els = get_elements_by_tagname(root(xml), "session-id")
