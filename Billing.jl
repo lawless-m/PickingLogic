@@ -3,11 +3,11 @@ unshift!(LOAD_PATH, "GitHub/PickingLogic/")
 unshift!(LOAD_PATH, "GitHub/XlsxWriter.jl/")
 
 include("utils.jl")
+include("merch_cats.jl")
 
 using HIARP
 using XlsxWriter
 using ExcelReaders
-
 
 function byPrtMonth(yr, mn)
 	RPClient.qSQL("
@@ -35,29 +35,26 @@ function prtmonths()
 	end
 end
 
-function prtnums2typcod(xlfn)
-	xl = @sheet xlfn 1
-	include("merch_cats.jl")
-	@Xls replace(xlfn, ".xlsx", "_typecodes") begin
-		ws = add_worksheet!(xls, "typeCodes")
-		write!(ws, 0, 0, "Article")
-		write!(ws, 0, 1, "Type Code")
-		write!(ws, 0, 2, "Type")
-		r = 1
-		for (prt, cod) in typeCodes(unique(xl[2:end,3]))
-			write!(ws, r, 0, prt)
-			write!(ws, r, 1, cod)
-			if haskey(Merch_cat, cod)
-				write!(ws, r, 2, Merch_cat[cod])
+function parseReport(repFn)
+	xl = @sheet repFn 1
+	@Xls replace(repFn, ".xlsx", "_PutAways") begin
+		typecodes = typeCodes(unique(xl[2:end,3]))
+		ws = add_worksheet!(xls, "Articles")
+		write_row!(ws, 0, 0, ["Article" "Descr" "Typcod" "Typ" "Put aways"])
+		puts = wherePuts(collect(keys(typecodes)), unique(xl[2:end,8])) # prtnums, wh_entry_ids
+		for xr in 2:size(xl, 1)
+			prtnum = xl[xr, 3]
+			c = write_row!(ws, xr, 0, [prtnum typecodes[prtnum][1].descr typecodes[prtnum][1].typcod Merch_cat[typecodes[prtnum][1].typcod]])
+			if haskey(puts, prtnum)
+				#c += write_row!(ws, xr, c, [puts[prtnum][1].descr])
+				c += write_row!(ws, xr, c, [s.stoloc for s in puts[prtnum]])	
 			end
-			r += 1
 		end
 	end
 end
 
+parseReport("Billing/Receiving_Report_November.xlsx")
 
-prtnums2typcod("Billing/Receiving_Report_November.xlsx")
 
 
- 
  

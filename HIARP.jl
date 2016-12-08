@@ -8,7 +8,7 @@ using DataFrames
 
 include("utils.jl")
 
-export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes
+export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes, wherePuts
 
 login("credentials.jls")
 
@@ -45,8 +45,8 @@ function show(io::IO, s::Stoloc)
 	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d descr:%s wh_entry_id:%s typcod:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.descr s.wh_entry_id s.typcod
 end
 
-macro commas(a)
-	:(join(["'$p'" for p in $a], ", "))
+macro IN(a)
+	:(" IN (" * join(["'$p'" for p in $a], ", ") * ")")
 end
 
 macro logCmd(blk)
@@ -105,10 +105,11 @@ function typeCode(prtnum)
 end
 
 function typeCodes(prtnums)
-	df = qSQL("SELECT prtnum, typcod from prtmst WHERE prtnum in (" * @commas(prtnums) * ") AND prt_client_id ='HUS' AND wh_id_tmpl='----'")
-	@dictCols(df, :prtnum, :typcod)
+	df = qSQL("SELECT prtnum, typcod, prtdsc.lngdsc AS dsc
+	FROM prtmst  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(prtmst.prtnum, '|HUS|%')
+	WHERE prtnum " * @IN(prtnums) * " AND prt_client_id ='HUS' AND wh_id_tmpl='----'")
+	DictVec(Stoloc, :prtnum, df)
 end
-
 
 function prtnum_stoloc_wh_entry_id()
 	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod in ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')")
@@ -136,10 +137,10 @@ end
 
 function FIFOStolocsDF(prtnums)
 	qSQL("
-	SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
+	SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc 
 	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
 	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')	
-	AND prtnum IN (" * @commas(prtnums) * ")")
+	AND prtnum " * @IN(prtnums))
 end
 
 function FIFOStolocs(prtnums, k)
@@ -228,6 +229,15 @@ end
 
 function stolocsHUS()
 	collect(qSQL("select distinct stoloc from locmst where (wh_id ='MIA' or wh_id='MFTZ')")[:stoloc])
+end
+
+function wherePut(prtnum, wh_entry_id)
+	qSQL("select distinct stoloc from inventory_view where prtnum=@prtnum and inv_attr_str5=@whid and lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')", [("prtnum", prtnum), ("whid", wh_entry_id)])
+end
+
+function wherePuts(prtnums, wh_entry_ids)
+	df = qSQL("SELECT DISTINCT prtnum, prtdsc.lngdsc AS dsc, stoloc FROM inventory_view INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%') WHERE prtnum " * @IN(prtnums) * " AND inv_attr_str5 " * @IN(wh_entry_ids) * " AND lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-9]%' or stoloc like 'F-%')")
+	DictVec(Stoloc, :prtnum, df)
 end
 
 
