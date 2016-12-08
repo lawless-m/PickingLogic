@@ -1,14 +1,14 @@
 
 cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, abspath("GitHub/PickingLogic/"))
-
+unshift!(LOAD_PATH, abspath("GitHub/XlsxWriter.jl/"))
 
 using ExcelReaders
 using Base.Dates
 using HIARP
+using XlsxWriter
 
 include("utils.jl")
-
 
 i64(a::AbstractString) = a=="TBD" ? -1 : parse(Int64, a)
 
@@ -45,20 +45,21 @@ function chanelLabels()
 
 end
 
-function printLods(fid, labels, lods)
+function printLods(ws, row, labels, lods)
 	for label in labels
 		if haskey(lods, string(locskus[label]))
 			prtnum = locskus[label]
 			maxqty = skulocs[prtnum][2]
-			lod = FIFOPick(lods[string(prtnum)])
-			if lod == nothing
-				lod = lods[string(prtnum)][1]
-				@printf fid "%s\t%s\tqty:%d\tMax:%d\t(%s) %s\r\n" label "DOMESTIC" 0 maxqty prtnum lod.descr
+			fifos = FIFOSort(lods[string(prtnum)])
+			if length(fifos) > 0
+				write_row!(ws, row, 0, [label fifos[1].stoloc fifos[1].qty maxqty prtnum fifos[1].descr])
 			else
-				@printf fid "%s\t%s\tqty:%d\tMax:%d\t(%s) %s\r\n" label lod.stoloc lod.qty maxqty prtnum lod.descr
+				write_row!(ws, row, 0, [label "DOMESTIC" 0 maxqty prtnum lods[string(prtnum)][1].descr])
 			end
+			row += 1
 		end
 	end
+	row
 end
 
 function testerInNonTestBin(k, v)
@@ -81,70 +82,75 @@ function testerInNonTestBin(k, v)
 	return false			
 end
 
-function printBRItems(fid, flt=(k,v)->true)
+function printBRItems(ws, flt=(k,v)->true)
+	write_row!(ws, 0, 0, ["Stoloc" "Qty" "Prtnum" "Descr"])
 	items = filter(flt, HIARP.BRItems())
+	row = 1
 	for s in sort(collect(keys(items)))
 		item = items[s][1]
-		@printf fid "%s\t%d\t(%s)\t%s\n" item.stoloc item.qty item.prtnum item.descr
+		write_row!(ws, row, 0, [item.stoloc item.qty item.prtnum item.descr])
+		row += 1
 	end
 end
 		
-function procRacks(fid, levels)
+function procRacks(ws, levels)
+	write_row!(ws, 0, 0, ["Stoloc" "NEXT FIFO" "FIFO Qty" "Fill QTY" "Prtnum" "Descr"])
+	row = 1
 	for rack in sort(collect(keys(rackskus)))
-		printLods(fid, intersect(locLabels, setdiff(FLabels([rack], 1:8, levels), currLabels)), FIFOStolocs(rackskus[rack], :prtnum))
-	end
-end
-
-function checkRacks()
-	tfd = rackFPrtnums()
-	for r in 1:size(tfd)[1]
-		loc = tfd[:stoloc][r]
-		if haskey(locskus, loc) && string(locskus[loc]) != tfd[:prtnum][r]
-			@printf "%s is %s, should be %s\n" loc tfd[:prtnum][r] locskus[loc]
+		if ! isnull(tryparse(Int64, rack))
+			row = printLods(ws, row, intersect(locLabels, setdiff(FLabels([parse(Int64,rack)], 1:8, levels), currLabels)), FIFOStolocs(rackskus[rack], :prtnum))
 		end
 	end
 end
 
-function bakerStatus(fid, labels)
+function checkRacks(ws)
+	write_row!(ws, 0, 0, ["Stoloc" "Has" "Should be"])
+	tfd = rackFPrtnums()
+	row = 1
+	for r in 1:size(tfd)[1]
+		loc = tfd[:stoloc][r]
+		if haskey(locskus, loc) && string(locskus[loc]) != tfd[:prtnum][r]
+			write_row!(ws, row, 0, [loc tfd[:prtnum][r] locskus[loc]])
+			row += 1
+		end
+	end
+end
+
+function bakerStatus(ws, labels)
 	empty = 0
 	exist = 0
 	testers = 0
+	write_row!(ws, 3, 0, ["Stoloc" "Prtnum" "Descr" "Qty"])
+	row = 4
 	for label in sort(labels)
 		exist += 1
 		if haskey(currStolocs, label)
 			item = currStolocs[label][1]
-			@printf fid "%s\t(%s) %s\t%d\n" label item.prtnum item.descr item.qty
+			write_row!(ws, row, 0, [label item.prtnum item.descr item.qty])
 			if item.descr[1:2] == "T "
 				testers += 1
 			end
 		else
 			empty += 1
-			@printf fid "%s\tEMPTY\n" label
+			write_row!(ws, row, 0, [label "EMPTY"])
 		end
+		row += 1
 	end
-	@printf fid "Testers: %d / %d = %d%%\n" testers exist round(100testers/exist)
-	@printf fid "Empty: %d / %d = %d%%\n" empty exist round(100empty/exist)
+	write_row!(ws, 0, 0, ["Locations" "Empty" "Empty%" "Testers" "Testers%"]) 
+	write_row!(ws, 1, 0, [exist empty empty/exist testers testers/exist])
 end
 
-j = 8
-if j==1
-	@fid "transfers/ALL-F.txt" procRacks(fid, [10:10:90; 91])
-elseif j==2
-	@fid "transfers/A-F.txt" procRacks(fid, [40 50 60])
-elseif j==3
-	checkRacks(locskus)
-elseif j == 4
-	@fid "transfers/Testers.txt"	printBRItems(fid, testerInNonTestBin)
-elseif j==5
-	d = Dates.format(today(), "u_d")
-	@fid "transfers/Status_$d.txt" bakerStatus(fid, BLabels())
-elseif j==6
-	d = Dates.format(today(), "u_d")
-	@fid "transfers/Status_Chanel_$d.txt" bakerStatus(fid, chanelLabels())
-elseif j==7
-	d = Dates.format(today(), "u_d")
-	@fid "transfers/Status_F-A_$d.txt" bakerStatus(fid, vec(FLabels(1:81, 1:8, [40; 50 ;60])))
-elseif j==8
-	@fid "transfers/Wrong_items.txt" checkRacks()
+d = Dates.format(today(), "u_d")
+@Xls "Status_$d" begin
+	procRacks(add_worksheet!(xls, "F-picks"), [10:10:90; 91])
+	procRacks(add_worksheet!(xls, "F-A-Picks"), [40 50 60])
+	bakerStatus(add_worksheet!(xls, "F-Contents"), vec(FLabels(1:81, 1:8, [10:10:90; 91])))
+	bakerStatus(add_worksheet!(xls, "F-A-Contents"), vec(FLabels(1:81, 1:8, [40; 50 ;60])))
+	checkRacks(add_worksheet!(xls, "Checks"))
+	printBRItems(add_worksheet!(xls, "Testers"), testerInNonTestBin)
+	bakerStatus(add_worksheet!(xls, "Bakers"), BLabels())
+	bakerStatus(add_worksheet!(xls, "Chanel"), chanelLabels())
+	
 end
+
 
