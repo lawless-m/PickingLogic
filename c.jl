@@ -1,18 +1,15 @@
-cd(ENV["USERPROFILE"] * "/Documents")
-unshift!(LOAD_PATH, "GitHub/PickingLogic/")
-unshift!(LOAD_PATH, "GitHub/XlsxWriter.jl/")
-
-using XlsxWriter
-
-
-# Create an new Excel file and add a worksheet.
-wb = Workbook("HUSLocs.xlsx")
-
-racks = AbstractString["01","02","03","04","05","06","07","08","09","1","10","11","12","13","14","15","15STAR","16","16HA0000216","16HA0000304","16HA0000451","16HA0000478VRA","16HA0000480","16HA0000499","16HA0000562","16HA0000577","16HA0000591","16HA0000600","16HA233/234","16HA451VARIANCE","17","18","181962210","19","20","21","22","23","24","25","251","252","253","254","255","256","257","258","26","27","28","281","282","283","285","29","30","31","32","33","34","35","36","37","38","39","40","41","42","43","50","51","52","525","526","527","528","529","53","530","54","55","56","57","58","59","60","625","626","627","628","629","630","725","726","727","728","729","730","80","81","82","83","84","85","86","87","88","89","90","91","92","93","94","BULKII","CONSOLIDATION","DAM","DESTR","DESTROY","DOOR","DSTROY","F-01","F-02","F-03","F-04","F-05","F-06","F-07","F-08","F-09","F-10","F-11","F-12","F-13","F-14","F-15","F-16","F-17","F-18","F-19","F-20","F-21","F-22","F-23","F-24","F-25","F-26","F-27","F-28","F-29","F-30","F-31","F-32","F-33","F-34","F-35","F-36","F-37","F-38","F-39","F-40","F-41","F-42","F-43","F-44","F-45","F-46","F-47","F-48","F-49","F-50","F-51","F-52","F-53","F-54","F-55","F-56","F-57","F-58","F-59","F-60","F-61","F-62","F-63","F-64","F-65","F-66","F-67","F-68","F-69","F-70","F-71","F-72","F-73","F-74","F-75","F-76","F-77","F-78","F-79","F-80","F-81","GWP","HUS","HUZ","LD","MEL","MFTZ_TRUCK","MIAFTZRF","OSTG","PARBELTM","PERM","QUAR","RCVSTG_HWL","RCVSTG_TEST","RDCK","RDTJARIAS","RDTLDUR","RDTMDUN","RDTSUPER","RECVQA","RSTAGE","RT","SL","TES","TEST","TEST_TRUCK","TRL","UM"]
-
-for r in racks
-	add_worksheet!(wb, replace(r, '/', '_'))
+function BLabels()
+	[ []
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 1:1, l in 10:10:60, b in [1:24; 31:55]])	
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:8, l in 10:10:60, b in [1:24; 31:55]])	
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 9:19, l in 10:10:60, b in 1:25] 	)
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 2:2, l in 70:70, b in 31:55]  	)
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:3, l in 70:70, b in [1:24; 31:55]]  	)
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 4:4, l in 70:70, b in [17:24; 31:55]] )
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 5:7, l in 70:70, b in 31:55]  )
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 8:11, l in 70:70, b in 1:24]  )	
+	]
 end
 
-close(wb)
+BLabels()
 

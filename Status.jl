@@ -25,140 +25,74 @@ end
 function BLabels()
 	[ []
 	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 1:1, l in 10:10:60, b in [1:24; 31:55]])	
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 2:2, l in 10:10:60, b in [31:55]])	
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:8, l in 10:10:60, b in [1:24; 31:55]])	
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:3, l in 10:10:60, b in 31:55])	
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 4:8, l in 10:10:60, b in [1:24; 31:55]])	
 	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 9:19, l in 10:10:60, b in 1:25] 	)
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 2:2, l in 70:70, b in [31:55]]  	)
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:3, l in 70:70, b in [1:24; 31:55]]  	)
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:3, l in 70:70, b in 31:55]  	)
 	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 4:4, l in 70:70, b in [17:24; 31:55]] )
 	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 5:7, l in 70:70, b in 31:55]  )
 	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 8:11, l in 70:70, b in 1:24]  )	
+	; vec(["03-50-17" "03-70-22" "03-70-23"])
 	]
 end
 
-function chanelLabels()
-	[ []
-	
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 15:15, l in [120; 140], b in 1:90]  )
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 15:15, l in [130], b in 1:120]  )
-
-	]
-
-end
-
-function printLods(ws, row, labels, lods)
-	for label in labels
-		if haskey(lods, string(locskus[label]))
-			prtnum = locskus[label]
-			maxqty = skulocs[prtnum][2]
-			fifos = FIFOSort(lods[string(prtnum)])
-			if length(fifos) > 0
-				write_row!(ws, row, 0, [label fifos[1].stoloc fifos[1].qty maxqty prtnum fifos[1].descr])
-			else
-				write_row!(ws, row, 0, [label "DOMESTIC" 0 maxqty prtnum lods[string(prtnum)][1].descr])
-			end
-			row += 1
-		end
-	end
-	row
-end
-
-function testerInNonTestBin(k, v)
-	if v[1].descr[1:2] == "T "		
-		if v[1].stoloc[1] == 'F'
-			return true
-		end
-		if v[1].stoloc[7] == '-'
-			return false
-		end
-		r, l, b =  map(x->parse(Int64,x), split(v[1].stoloc, '-'))
-		if l < 9 && b > 55
-			return false
-		end
-		if b > 25
-			return false
-		end
-		return true
-	end
-	return false			
-end
-
-function printBRItems(ws, flt=(k,v)->true)
-	write_row!(ws, 0, 0, ["Stoloc" "Qty" "Prtnum" "Descr"])
-	items = filter(flt, HIARP.BRItems())
-	row = 1
-	for s in sort(collect(keys(items)))
-		item = items[s][1]
-		write_row!(ws, row, 0, [item.stoloc item.qty item.prtnum item.descr])
-		row += 1
-	end
-end
-		
-function procRacks(ws, levels)
-	write_row!(ws, 0, 0, ["Stoloc" "NEXT FIFO" "FIFO Qty" "Fill QTY" "Prtnum" "Descr"])
-	row = 1
-	for rack in sort(collect(keys(rackskus)))
-		if ! isnull(tryparse(Int64, rack))
-			row = printLods(ws, row, intersect(locLabels, setdiff(FLabels([parse(Int64,rack)], 1:8, levels), currLabels)), FIFOStolocs(rackskus[rack], :prtnum))
-		end
-	end
-end
-
-function checkRacks(ws)
-	write_row!(ws, 0, 0, ["Stoloc" "Has" "Should be"])
-	tfd = rackFPrtnums()
-	row = 1
-	for r in 1:size(tfd)[1]
-		loc = tfd[:stoloc][r]
-		if haskey(locskus, loc) && string(locskus[loc]) != tfd[:prtnum][r]
-			write_row!(ws, row, 0, [loc tfd[:prtnum][r] locskus[loc]])
-			row += 1
-		end
-	end
+function countif(col, startr, endr, cond)
+	@sprintf "countif(%s:%s, \"%s\")" rc2cell(startr, col) rc2cell(endr, col) cond
 end
 
 function bakerFStatus(ws)
 	labels = FLabels(1:81, 1:8, [10:10:90; 91])
-	deployed = vec([FLabels(1:6, 1:8, [10:10:90; 91]); FLabels(7:9, 1:8, [40:10:60;]); FLabels(10:10, 1:8, 50:50)] )
+	deployed = vec([FLabels(1:9, 1:8, [10:10:90; 91]); FLabels(7:9, 1:8, [40:10:60;]); FLabels(10:10, 1:8, 50:50); FLabels(12:12, 1:4, [10:10:90; 91])] )
 	currentProd = DictVec(Stoloc, :stoloc, rackFPrtnums())
-	write_row!(ws, 3, 0, ["Stoloc" "Deployed" "Prtnum" "Descr" "Qty" "Assigned" "Reassign?" "Fill"])
-	row = startrow = 4
+	cols = ["Stoloc" "Deployed" "Prtnum" "Descr" "Qty" "Assigned" "WrongProd" "Fill" "Ass&Dep" "Replenishable"]
+	row = startrow = 5
+	write_row!(ws, startrow-1, 0, cols)
 	for label in sort(labels)
 		prtass = string(get(locskus, label, ""))
+		
 		if haskey(currStolocs, label)
 			item = currStolocs[label][1]
 			prtin = string(item.prtnum)
-			reass = prtass == "" ? "" : prtin==prtass ? "":"Yes"		
-			fill = (reass == "Yes" && prtass != "") ? "Yes" : ""
-			write_row!(ws, row, 0, [label (label in deployed ? "*":"") prtin item.descr item.qty prtass reass fill])
+			reass = prtass == "" ? "" : prtin==prtass ? "" : "Yes"
+			fill = reass == "Yes" && prtass != "" ? "Yes" : ""
+			assdep = prtass=="" ? "" : "Yes"
+			write_row!(ws, row, 0, [label "*" prtin item.descr item.qty prtass reass fill assdep ""])
 		else
+			dep = (label in deployed ? "*":"")
 			fill = prtass == "" ? "":"Yes"
-			write_row!(ws, row, 0, [label (label in deployed ? "*":"") "EMPTY" "" "" prtass "" fill])
+			depass = dep == "*" && prtass != "" ? "Yes" : ""
+			write_row!(ws, row, 0, [label dep "EMPTY" "" "" prtass "" fill depass depass])
 		end
 		row += 1
 	end
-	write_row!(ws, 0, 0, ["Locations" "Deployed" "Deployed%" "Empty" "Empty%" "Assigned" "Assigned%" "Wrong Prod" "Wrong Prod%" "Need Fill" "Need Fill%"]) 
+	row -= 1
+	write_row!(ws, 0, 0, ["Locations" "Deployed" "Empty" "Assigned" "Ass&Dep" "WrongProd" "NeedFill" "Replenishable"]) 
+	write!(ws, 2, 0, "%") 
 
-	startrow += 1
-	C = 'A'
-	c = write_row!(ws, 1, 0, ["=countif($C$startrow:$C$row, \"<>\"\"\")"])
-	C = 'B'
-	c += write_row!(ws, 1, c, ["=countif($C$startrow:$C$row, \"*\")" "=indirect(\"C[-1]\", false) / indirect(\"C[-$(c+1)]\", false)"])
-	C = 'C'
-	c += write_row!(ws, 1, c, ["=countif($C$startrow:$C$row, \"EMPTY\")" "=indirect(\"C[-1]\", false) / indirect(\"C[-$(c+1)]\", false)"])
-	C = 'F'
-	c += write_row!(ws, 1, c, ["=indirect(\"C[-$(c)]\", false)-countif($C$startrow:$C$row, \"\")" "=indirect(\"C[-1]\", false) / indirect(\"C[-$(c+1)]\", false)"])
-	C = 'G'
-	c += write_row!(ws, 1, c, ["=countif($C$startrow:$C$row, \"Yes\")" "=indirect(\"C[-1]\", false) / indirect(\"C[-$(c+1)]\", false)"])
-	C = 'H'
-	c += write_row!(ws, 1, c, ["=countif($C$startrow:$C$row, \"Yes\")" "=indirect(\"C[-1]\", false) / indirect(\"C[-$(c+1)]\", false)"])	
+	coln(k) = findfirst(cols, k) -1
+	
+	c = write_row!(ws, 1, 0, ["=" * countif(coln("Stoloc"), startrow, row, "<>\"\"")])
+	totAdd = string(Char('@' + coln("Locations") - 1)) * "2"
+	write_column!(ws, 1, c, ["=" * countif(coln("Deployed"), startrow, row, "*") "=indirect(\"R[-1]\", false) / $totAdd"])
+	c += 1
+	write_column!(ws, 1, c, ["=" * countif(coln("Prtnum"), startrow, row, "EMPTY") "=indirect(\"R[-1]\", false) / $totAdd"])
+	c += 1
+	write_column!(ws, 1, c, ["=A2-" * countif(coln("Assigned"), startrow, row, "") "=indirect(\"R[-1]\", false) / $totAdd"])
+	c += 1
+	write_column!(ws, 1, c, ["=" * countif(coln("Ass&Dep"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / $totAdd"])
+	c += 1
+	write_column!(ws, 1, c, ["=" * countif(coln("WrongProd"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / $totAdd"])
+	c += 1
+	write_column!(ws, 1, c, ["=" * countif(coln("Fill"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / $totAdd"])	
+	c += 1
+	write_column!(ws, 1, c, ["=" * countif(coln("Replenishable"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / " * string(Char('@' + coln("Assigned") - 1)) * "2"])	
+	c + 3
 end
 
-function bakerExisting(ws)
-	c = 12
+function bakerExisting(ws, c)
 	labels = BLabels()
 	write_row!(ws, 3, c, ["Stoloc" "Prtnum" "Descr" "Qty"])
-	row = startrow = 4
+	row = startrow = 5
 	for label in sort(labels)
 		if haskey(currStolocs, label)
 			item = currStolocs[label][1]
@@ -168,29 +102,17 @@ function bakerExisting(ws)
 		end
 		row += 1
 	end
-
+	row -= 1
 	write_row!(ws, 0, c, ["Locations" "Filled"]) 
-	C = 'M'
 	cntC = c
-	c += write_row!(ws, 1, c, ["=countif($C$startrow:$C$row, \"<>\"\"\")"])
-	C = 'N'
-	c += write_row!(ws, 1, c, ["=indirect(\"C[-1]\", false)-countif($C$startrow:$C$row, \"EMPTY\")"])
-	startrow += 1
-
+	c += write_row!(ws, 1, c, ["=" * countif(cntC, startrow, row, "<>\"\""), "=indirect(\"C[-1]\", false)-" * countif(cntC+1, startrow, row, "EMPTY")])
 end
 
 d = Dates.format(today(), "u_d")
 @Xls "Status_$d" begin
 	ws = add_worksheet!(xls, "F-Contents")
-#   procRacks(add_worksheet!(xls, "F-picks"), [10:10:90; 91])
-#	procRacks(add_worksheet!(xls, "F-A-Picks"), [40 50 60])
-	bakerFStatus(ws)
-#	bakerStatus(add_worksheet!(xls, "F-A-Contents"), vec(FLabels(1:81, 1:8, [40; 50 ;60])))
-#	checkRacks(add_worksheet!(xls, "Checks"))
-#	printBRItems(add_worksheet!(xls, "Testers"), testerInNonTestBin)
-	bakerExisting(ws)
-#	bakerStatus(add_worksheet!(xls, "Chanel"), chanelLabels())
-	
+	c = bakerFStatus(ws)
+	bakerExisting(ws, c+1)	
 end
 
 
