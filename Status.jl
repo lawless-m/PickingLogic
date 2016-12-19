@@ -18,6 +18,10 @@ locLabels = collect(keys(locskus))
 currStolocs = currentStolocs()
 currLabels = collect(keys(currStolocs))
 
+function allFLabels()
+	vec([FLabels(1:42, 1:8, [10:10:90; 91]); FLabels(43:81, 1:8, [10:10:90; 91; 92; 93])])
+end
+
 function FLabels(racks, bins, levels)
 	vec([@sprintf("F-%02d-%02d-%02d", r, l, b) for r in racks, b in bins, l in levels])
 end
@@ -41,7 +45,7 @@ function countif(col, startr, endr, cond)
 end
 
 function bakerFStatus(ws)
-	labels = FLabels(1:81, 1:8, [10:10:90; 91])
+	labels = allFLabels()
 	deployed = vec([FLabels(1:9, 1:8, [10:10:90; 91]); FLabels(7:9, 1:8, [40:10:60;]); FLabels(10:10, 1:8, 50:50); FLabels(12:12, 1:4, [10:10:90; 91])] )
 	currentProd = DictVec(Stoloc, :stoloc, rackFPrtnums())
 	cols = ["Stoloc" "Deployed" "Prtnum" "Descr" "Qty" "Assigned" "WrongProd" "Fill" "Ass&Dep" "Replenishable"]
@@ -70,22 +74,22 @@ function bakerFStatus(ws)
 	write!(ws, 2, 0, "%") 
 
 	coln(k) = findfirst(cols, k) -1
+	colC(k) = string(Char('A' + coln(k))) 
 	
 	c = write_row!(ws, 1, 0, ["=" * countif(coln("Stoloc"), startrow, row, "<>\"\"")])
-	totAdd = string(Char('@' + coln("Locations") - 1)) * "2"
-	write_column!(ws, 1, c, ["=" * countif(coln("Deployed"), startrow, row, "*") "=indirect(\"R[-1]\", false) / $totAdd"])
+	write_column!(ws, 1, c, ["=" * countif(coln("Deployed"), startrow, row, "*") "=indirect(\"R[-1]\", false) / " * colC("Stoloc") * "2"])
 	c += 1
-	write_column!(ws, 1, c, ["=" * countif(coln("Prtnum"), startrow, row, "EMPTY") "=indirect(\"R[-1]\", false) / $totAdd"])
+	write_column!(ws, 1, c, ["=" * countif(coln("Prtnum"), startrow, row, "EMPTY") "=indirect(\"R[-1]\", false) / " * colC("Stoloc") * "2"])
 	c += 1
-	write_column!(ws, 1, c, ["=A2-" * countif(coln("Assigned"), startrow, row, "") "=indirect(\"R[-1]\", false) / $totAdd"])
+	write_column!(ws, 1, c, ["=A2-" * countif(coln("Assigned"), startrow, row, "") "=indirect(\"R[-1]\", false) / " * colC("Stoloc") * "2"])
 	c += 1
-	write_column!(ws, 1, c, ["=" * countif(coln("Ass&Dep"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / $totAdd"])
+	write_column!(ws, 1, c, ["=" * countif(coln("Ass&Dep"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / " * colC("Stoloc") * "2"])
 	c += 1
-	write_column!(ws, 1, c, ["=" * countif(coln("WrongProd"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / $totAdd"])
+	write_column!(ws, 1, c, ["=" * countif(coln("WrongProd"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / " * colC("Stoloc") * "2"])
 	c += 1
-	write_column!(ws, 1, c, ["=" * countif(coln("Fill"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / $totAdd"])	
+	write_column!(ws, 1, c, ["=" * countif(coln("Fill"), startrow, row, "Yes") "=indirect(\"R[-1]\", false)/ " * colC("Stoloc") * "2"])
 	c += 1
-	write_column!(ws, 1, c, ["=" * countif(coln("Replenishable"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / " * string(Char('@' + coln("Assigned") - 1)) * "2"])	
+	write_column!(ws, 1, c, ["=" * countif(coln("Replenishable"), startrow, row, "Yes") "=indirect(\"R[-1]\", false) / " * colC("Assigned") * "2"])	
 	c + 3
 end
 
