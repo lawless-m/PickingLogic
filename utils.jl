@@ -220,3 +220,25 @@ function deXLS(fn)
 	close(fid)
 end
 
+function BLabels()
+	[ []
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 1:1, l in 10:10:60, b in [1:24; 31:55]])	
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:3, l in 10:10:60, b in 31:55])	
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 4:8, l in 10:10:60, b in [1:24; 31:55]])	
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 9:19, l in 10:10:60, b in 1:25] 	)
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:3, l in 70:70, b in 31:55]  	)
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 4:4, l in 70:70, b in [17:24; 31:55]] )
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 5:7, l in 70:70, b in 31:55]  )
+	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 8:11, l in 70:70, b in 1:24]  )	
+	; vec(["03-50-17" "03-70-22" "03-70-23"])
+	]
+end
+
+
+function allFLabels()
+	vec([FLabels(1:42, 1:8, [10:10:90; 91]); FLabels(43:81, 1:8, [10:10:90; 91; 92; 93])])
+end
+
+function FLabels(racks, bins, levels)
+	vec([@sprintf("F-%02d-%02d-%02d", r, l, b) for r in racks, b in bins, l in levels])
+end
