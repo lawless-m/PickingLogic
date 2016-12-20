@@ -8,7 +8,7 @@ using DataFrames
 
 include("utils.jl")
 
-export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes, wherePuts
+export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes, wherePuts, HAIItems, BRItems, currentPrtlocs
 
 login("credentials.jls")
 
@@ -105,7 +105,7 @@ function typeCode(prtnum)
 end
 
 function typeCodes(prtnums)
-	df = qSQL("SELECT prtnum, typcod, prtdsc.lngdsc AS dsc
+	df = qSQL("SELECT DISTINCT prtnum, typcod, prtdsc.lngdsc AS dsc
 	FROM prtmst  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(prtmst.prtnum, '|HUS|%')
 	WHERE prtnum " * @IN(prtnums) * " AND prt_client_id ='HUS' AND wh_id_tmpl='----'")
 	DictVec(Stoloc, :prtnum, df)
@@ -143,7 +143,7 @@ function FIFOStolocsDF(prtnums)
 	AND prtnum " * @IN(prtnums))
 end
 
-function FIFOStolocs(prtnums, k)
+function FIFOStolocs(prtnums, k::Symbol)
 	DictVec(Stoloc, k, FIFOStolocsDF(prtnums))
 end
 
@@ -155,6 +155,12 @@ function BRItems()
 	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
 	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
 	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')"))
+end
+
+function HAIItems()
+	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
+	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
+	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')"))
 end
 
 function SKUs()
@@ -200,6 +206,10 @@ function currentStolocsDF()
 	qSQL("SELECT distinct CBI.arecod as area, CBI.prtnum as prtnum, CBI.stoloc as stoloc, CBI.untqty as qty, prtdsc.lngdsc as dsc, inv_attr_str5 as wh_entry_id 
 	FROM client_blng_inv AS CBI INNER JOIN prtdsc on prtdsc.colval = CONCAT(CBI.prtnum, '|HUS|MFTZ') 
 	WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
+end
+
+function currentPrtlocs()
+	DictVec(Stoloc, :prtnum, currentStolocsDF())
 end
 
 function currentStolocs()
