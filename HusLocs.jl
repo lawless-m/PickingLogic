@@ -84,7 +84,8 @@ function allstolocs()
 	stolocs = stolocsHUS()
 	racks = racklist(stolocs)
 	allrow = 1
-	@Xls "HUSLocs" begin
+	d = Dates.format(today(), "u_d")
+	@Xls "HUSLocs_$d" begin
 		Cols = [("Area", 10) ("Loc", 12) ("prtnum", 10) ("Descr", 35) ("Qty", 5) ("Fixed Loc", 11) ("Typecode", 12) ("Category", 25)]
 		bold = add_format!(xls ,Dict("bold"=>true))
 		date_format = add_format!(xls, Dict("num_format"=>"d mmmm yyyy"))
