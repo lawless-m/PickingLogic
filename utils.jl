@@ -212,6 +212,26 @@ function rackSkus(skulocs)
 	rks
 end
 
+function typeCodesSerial()
+	tcfn = "g:/Heinemann/partTypecodes.jls"
+	if ! isfile(tcfn)
+		curr = currentStolocs()
+		parts = Set{AbstractString}()
+		partTyps = Dict{AbstractString, AbstractString}()
+		for (loc, prts) in curr
+			push!(parts, prts[1].prtnum)
+		end
+		typecodes = typeCodes(parts)
+		for (prt, typcods) in typecodes
+			partTyps[prt] = typcods[1].typcod
+		end
+		@serialise tcfn partTyps
+		partTyps
+	else
+		@deserialise tcfn
+	end
+end
+
 function deXLS(fn)
 	s, l = skuLocationsXLS()
 	r = rackSkus(skulocs)
