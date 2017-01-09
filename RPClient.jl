@@ -180,7 +180,12 @@ function columns(tbl)
 	qMoca("[ SELECT * from $tbl WHERE 1=0]")
 end
 
-
-
+function tables()
+	qSQL("SELECT TableName = c.table_name, TableType = t.table_type, ColumnName = c.column_name, DataType = data_type
+	FROM information_schema.columns c INNER JOIN information_schema.tables t ON c.table_name = t.table_name AND c.table_schema = t.table_schema
+	ORDER BY TableName, ordinal_position")
 end
 
+# staahhhp
+
+end
