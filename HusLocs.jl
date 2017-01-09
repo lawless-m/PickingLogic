@@ -3,21 +3,25 @@ cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, abspath("GitHub/PickingLogic/"))
 unshift!(LOAD_PATH, "GitHub/XlsxWriter.jl/")
 
+using Base.Dates
 using HIARP
 using XlsxWriter
 
 include("utils.jl")
 include("merch_cats.jl")
+include("families.jl")
+
 
 skulocs, locskus, rackskus = skuLocations()
 
 curr = currentStolocs()
+typecodes = typeCodesSerial()
 
 z3(n) = @sprintf "%03d" n
 z2(n) = @sprintf "%02d" n
 
 function merch(prtnum)
-	typcod = typeCode(prtnum)
+	typcod = get(typecodes, prtnum, "")
 	if haskey(Merch_cat, typcod)
 		typcod, Merch_cat[typcod]
 	else
@@ -80,48 +84,56 @@ function racklist(stolocs)
 	racks
 end
 
+
+function writeLoc(curr, sheets, rack, loc, area)
+	if haskey(curr, loc)
+		sto = curr[loc][1]
+		data = [area loc sto.prtnum sto.descr sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)...]
+	else
+		data = [area loc]					
+	end
+	write_row!(sheets[area][1], sheets[area][2], 0, data[2:end])
+	write_row!(sheets[rack][1], sheets[rack][2], 0, data)
+	write_row!(sheets["All"][1], sheets["All"][2], 0, data)	
+		
+	for s in (area, rack, "All")
+		sheets[s] = (sheets[s][1], sheets[s][2] + 1)
+	end
+
+end
+
+function getArea(locs)
+	for loc in locs
+		if haskey(curr, loc)
+			return curr[loc][1].area
+		end
+	end
+	"NO AREA"
+end
+
 function allstolocs()
 	stolocs = stolocsHUS()
 	racks = racklist(stolocs)
+	locareas = locAreas()
 	d = Dates.format(today(), "u_d")
 	@Xls "HUSLocs_$d" begin
 		Cols = [("Area", 10) ("Loc", 12) ("prtnum", 10) ("Descr", 35) ("Qty", 5) ("Fixed Loc", 11) ("Typecode", 12) ("Category", 25)]
 		bold = add_format!(xls ,Dict("bold"=>true))
 		date_format = add_format!(xls, Dict("num_format"=>"d mmmm yyyy"))
-		sheets = Dict{AbstractString, Tuple{Worksheet, Int64}}()
+		sheets = Dict{AbstractString, Tuple{Worksheet, Int64}}() # name => (ws, rownum)
 		sheets["All"] = (newSheet(xls, "ALL", Cols, bold), 1)
+		tick = 0
 		for rack in sort(collect(keys(racks)))
-			area = ""
-			for loc in racks[rack]
-				if haskey(curr, loc)
-					area = curr[loc][1].area
-					break
-				end
-			end
-			if area == ""
-				area = "NO AREA"
-			end
+			println(rack)
+			area = get(locareas, racks[rack][1], "NO AREA")
 			if !haskey(sheets, area)
 				sheets[area] = (newSheet(xls, area, Cols[2:end], bold), 1)
 			end
 			if !haskey(sheets, rack)
 				sheets[rack] = (newSheet(xls, rack, Cols, bold), 1)
 			end
-			row = 1
 			for loc in sort(racks[rack])
-				if haskey(curr, loc)
-					sto = curr[loc][1]
-					data = [area loc sto.prtnum sto.descr sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)...]
-				else
-					data = [area loc]					
-				end
-				write_row!(sheets[area][1], sheets[area][2], 0, data[2:end])
-				write_row!(sheets[rack][1], sheets[rack][2],0, data)	
-				write_row!(sheets["All"][1], sheets["All"][2],0, data)	
-					
-				for s in (area, rack, "All")
-					sheets[s] = (sheets[s][1], sheets[s][2] + 1)
-				end
+				writeLoc(curr, sheets, rack, loc, area)
 			end
 		end
 	end
@@ -160,6 +172,8 @@ function rackmoves(wb, racks)
 end
 
 #@time @Xls "Rack_80-86_91_contents" rackmoves(xls, Dict("80"=>34:41))	#, "81"=>81, "82"=>82, "83"=>83, "84"=>84, "85"=>85, "86"=>86, "91"=>91))
+
+HIARP.setLog(true)
 
 @time allstolocs()
 
