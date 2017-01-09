@@ -8,7 +8,7 @@ using DataFrames
 
 include("utils.jl")
 
-export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes, wherePuts, HAIItems, BRItems, currentPrtlocs, locAreas
+export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes, wherePuts, HAIItems, BRItems, currentPrtlocs, locAreas, prtsInfo
 
 login("credentials.jls")
 
@@ -41,12 +41,36 @@ type Stoloc
 	end
 end
 
+type Part
+	prtnum::AbstractString
+	typcod::AbstractString
+	family::AbstractString
+	descr::AbstractString
+	Part() = new("", "", "", "")
+	Part(p, t, f, d) = new(p, t, f, d)
+	function Part(df, r)
+		dns(x)=x
+		dns(x::DataArrays.NAtype)=""
+		
+		p = dns(haskey(df, :prtnum) ? df[:prtnum][r] : "")
+		t = dns(haskey(df, :typcod) ? df[:typcod][r] : "")
+		f = dns(haskey(df, :prtfam) ? df[:prtfam][r] : "")
+		d = dns(haskey(df, :dsc) ? df[:dsc][r] : "")
+		
+		new(p, t, f, d)
+	end
+end
+
 function show(io::IO, s::Stoloc)
 	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d descr:%s wh_entry_id:%s typcod:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.descr s.wh_entry_id s.typcod
 end
 
 macro IN(a)
 	:(" IN (" * join(["'$p'" for p in $a], ", ") * ")")
+end
+
+macro INpfx(pfx, a)
+	:(" IN (" * join(["'$pfx$p'" for p in $a], ", ") * ")")
 end
 
 macro logCmd(blk)
@@ -104,12 +128,32 @@ function typeCode(prtnum)
 	qSQL("SELECT typcod from prtmst WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id_tmpl='----'", [("prtnum", prtnum)])[:typcod][1]
 end
 
-function typeCodes(prtnums)
-	df = qSQL("SELECT DISTINCT prtnum, typcod, prtdsc.lngdsc AS dsc
-	FROM prtmst  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(prtmst.prtnum, '|HUS|%')
-	WHERE prtnum " * @IN(prtnums) * " AND prt_client_id ='HUS' AND wh_id_tmpl='----'")
-	DictVec(Stoloc, :prtnum, df)
+function prtsInfo()
+	df = qSQL("SELECT DISTINCT prtnum, typcod, prtfam
+	FROM prtmst 
+	WHERE prt_client_id ='HUS' AND wh_id_tmpl='----'")
+	prts = DictMap(Part, :prtnum, df)
+	names = prtNames()
+	for r in 1:size(names[1], 1)
+		if haskey(prts, names[:colval][r][1:end-9])
+			prts[names[:colval][r][1:end-9]].descr = names[:lngdsc][r]
+		end
+	end
+	prts
 end
+function prtsInfo(prtnums)
+	df = qSQL("SELECT DISTINCT prtnum, typcod, prtfam, prtdsc.lngdsc AS dsc
+	FROM prtmst INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(prtmst.prtnum, '|HUS|%')
+	WHERE prtnum " * @IN(prtnums) * " AND prt_client_id ='HUS' AND wh_id_tmpl='----'")
+	DictMap(Part, :prtnum, df)
+end
+
+function prtNames()
+	qSQL("SELECT DISTINCT colval, lngdsc
+        FROM prtdsc
+        WHERE colval LIKE '%|HUS|----'")
+end	
+
 
 function prtnum_stoloc_wh_entry_id()
 	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod in ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')")
@@ -200,6 +244,11 @@ function orderFreqByQtr()
 			FROM ord_line
 			WHERE  client_id='HUS' AND wh_id='MFTZ')
 		SELECT prtnum, COUNT(*) AS cnt, qtr FROM ords GROUP BY prtnum, qtr")
+end
+
+function itemMaster()
+	qSQL("SELECT prtnum, typcod, prtfam, lngdsc from prtmst where prt_client_id='HUS'")
+	
 end
 
 function currentStolocsDF()

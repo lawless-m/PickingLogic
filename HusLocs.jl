@@ -9,40 +9,46 @@ using XlsxWriter
 
 include("utils.jl")
 include("merch_cats.jl")
-include("families.jl")
+include("Families.jl")
+
+function newSheet(wb, rack, Cols, fmt)
+	ws = add_worksheet!(wb, rack)
+	for c in 'A':'@'+length(Cols)
+		set_column!(ws, "$c:$c", Cols[c-'@'][2])
+		write_string!(ws, "$(c)1", Cols[c-'@'][1], fmt)
+	end
+	freeze_panes!(ws, 1, 0)
+	ws
+end
+z3(n) = @sprintf "%03d" n
+z2(n) = @sprintf "%02d" n
+
 
 
 skulocs, locskus, rackskus = skuLocations()
 
 curr = currentStolocs()
-typecodes = typeCodesSerial()
+partList = prtsInfo()
 
-z3(n) = @sprintf "%03d" n
-z2(n) = @sprintf "%02d" n
 
 function merch(prtnum)
-	typcod = get(typecodes, prtnum, "")
-	if haskey(Merch_cat, typcod)
-		typcod, Merch_cat[typcod]
+	prt = get(partList, prtnum, HIARP.Part())
+	if prt.prtnum == prtnum
+		prt.typcod, get(Merch_cat, prt.typcod, "")
 	else
-		typcod, ""
+		"", ""
 	end
 end
 
-function procLevel(ws, row, rack)
-	for bin in [[z3(n) for n in 1:500]; [z2(n) for n in 1:500]]
-		for level in [[z2(n) for n in 10:5:60]; [z3(n) for n in 10:5:60]]
-			label = @sprintf "%s-%s-%s" rack level bin
-			if haskey(curr, label)
-				sto = curr[label][1]
-				data = [label sto.prtnum sto.descr sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)...]
-				write_row!(ws, row, 0, data)
-				row = row + 1
-			end
-		end
+function family(prtnum)
+	prt = get(partList, prtnum, HIARP.Part())
+	if prt.prtnum == prtnum
+		prt.family, get(Familes, prt.family, "")
+	else
+		"", ""
 	end
-	row
 end
+
 
 function rackName(stoloc)
 	d = search(stoloc, '-')
@@ -88,7 +94,7 @@ end
 function writeLoc(curr, sheets, rack, loc, area)
 	if haskey(curr, loc)
 		sto = curr[loc][1]
-		data = [area loc sto.prtnum sto.descr sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)...]
+		data = [area loc sto.prtnum sto.descr sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...]
 	else
 		data = [area loc]					
 	end
@@ -117,7 +123,7 @@ function allstolocs()
 	locareas = locAreas()
 	d = Dates.format(today(), "u_d")
 	@Xls "HUSLocs_$d" begin
-		Cols = [("Area", 10) ("Loc", 12) ("prtnum", 10) ("Descr", 35) ("Qty", 5) ("Fixed Loc", 11) ("Typecode", 12) ("Category", 25)]
+		Cols = [("Area", 10) ("Loc", 12) ("prtnum", 10) ("Descr", 35) ("Qty", 5) ("Fixed Loc", 11) ("Typecode", 12) ("Category", 25) ("Famcode", 12) ("Family", 25)]
 		bold = add_format!(xls ,Dict("bold"=>true))
 		date_format = add_format!(xls, Dict("num_format"=>"d mmmm yyyy"))
 		sheets = Dict{AbstractString, Tuple{Worksheet, Int64}}() # name => (ws, rownum)
@@ -139,41 +145,8 @@ function allstolocs()
 	end
 end
 
-function rack28moves()
-	rackmoves("28", 28:28)
-end
 
-function newSheet(wb, rack, Cols, fmt)
-	ws = add_worksheet!(wb, rack)
-	for c in 'A':'@'+length(Cols)
-		set_column!(ws, "$c:$c", Cols[c-'@'][2])
-		write_string!(ws, "$(c)1", Cols[c-'@'][1], fmt)
-	end
-	freeze_panes!(ws, 1, 0)
-	ws
-end
-	
-
-function rackmoves(wb, racks)
-	Cols = [("Loc", 12) ("prtnum", 10) ("Descr", 35) ("Qty", 5) ("Fixed Loc", 11) ("Typecode", 12) ("Category", 25)]
-	bold = add_format!(wb,Dict("bold"=>true))
-	for rack in sort(collect(keys(racks)))
-		ws = add_worksheet!(wb, rack)
-		for c in 'A':'A'+length(Cols)
-			set_column!(ws, "$c:$c", Cols[c-'@'][2])
-			write_string!(ws, "$(c)1", Cols[c-'@'][1], bold)
-		end
-		freeze_panes!(ws, 1, 0)
-		row = 1
-		for p in racks[rack]
-			row = procLevel(ws, row, p)
-		end
-	end
-end
-
-#@time @Xls "Rack_80-86_91_contents" rackmoves(xls, Dict("80"=>34:41))	#, "81"=>81, "82"=>82, "83"=>83, "84"=>84, "85"=>85, "86"=>86, "91"=>91))
-
-HIARP.setLog(true)
+# HIARP.setLog(true)
 
 @time allstolocs()
 

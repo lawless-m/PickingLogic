@@ -73,15 +73,22 @@ end
 
 function DictVec(T, k, df)
 	dd = Dict{AbstractString, Vector{T}}() # AbstractString => Vector{T}
-	for r in 1:size(df[1])[1]
+	for r in 1:size(df[1], 1)
 		@push!(dd, df[k][r], T(df, r))
 	end	
+	dd
+end
+function DictMap(T, k, df)
+	dd = Dict{AbstractString, T}() # AbstractString => T
+	for r in 1:size(df[1], 1)
+		dd[df[k][r]] = T(df, r)
+	end
 	dd
 end
 
 function i64DictVec(T, k, df)
 	dd = Dict{Int64, Vector{T}}() # Int64 => Vector{T}
-	for r in 1:size(df[1])[1]
+	for r in 1:size(df[1], 1)
 		@push!(dd, i64(df[k][r]), T(df, r))
 	end	
 	dd
@@ -210,26 +217,6 @@ function rackSkus(skulocs)
 		end
 	end
 	rks
-end
-
-function typeCodesSerial()
-	tcfn = "g:/Heinemann/partTypecodes.jls"
-	if ! isfile(tcfn)
-		curr = currentStolocs()
-		parts = Set{AbstractString}()
-		partTyps = Dict{AbstractString, AbstractString}()
-		for (loc, prts) in curr
-			push!(parts, prts[1].prtnum)
-		end
-		typecodes = typeCodes(parts)
-		for (prt, typcods) in typecodes
-			partTyps[prt] = typcods[1].typcod
-		end
-		@serialise tcfn partTyps
-		partTyps
-	else
-		@deserialise tcfn
-	end
 end
 
 function deXLS(fn)
