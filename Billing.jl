@@ -53,7 +53,7 @@ function parseReport(repFn)
 	end
 end
 
-parseReport("Billing/Receiving_Report_November.xlsx")
+parseReport("Billing/December_processed.xlsx")
 
 
 
