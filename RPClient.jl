@@ -153,6 +153,7 @@ function login(credfile) # serialized "host"=>"http://$host:$port", "un"=>$un, "
 		@query xroot "login user where usr_id = @usr_id and usr_pswd = @usr_pswd"
 	end
 	CREDENTIALS["key"] = resp[:session_key][1]
+	@printf STDERR "Logged in as %s [%s]\n" CREDENTIALS["un"] CREDENTIALS["key"]
 end
 
 function newSessionID()
