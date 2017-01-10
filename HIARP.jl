@@ -11,6 +11,7 @@ include("utils.jl")
 export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes, wherePuts, HAIItems, BRItems, currentPrtlocs, locAreas, prtsInfo
 
 login("credentials.jls")
+setLog(true)
 
 type Stoloc
 	prtnum::AbstractString
