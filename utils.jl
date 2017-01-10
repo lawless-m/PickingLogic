@@ -254,15 +254,45 @@ function BLabels()
 	]
 end
 
+function FLabel(r, b, l)
+	@sprintf "F-%02d-%02d-%02d" r l b
+end
+
+function FLabels(racks, bins, levels)
+	vec([FLabel(r, l, b) for r in racks, b in bins, l in levels])
+end
 
 function allFLabels()
 	vec([FLabels(1:42, 1:8, [10:10:90; 91]); FLabels(43:81, 1:8, [10:10:90; 91; 92; 93])])
 end
 
-function FLabels(racks, bins, levels)
-	vec([@sprintf("F-%02d-%02d-%02d", r, l, b) for r in racks, b in bins, l in levels])
-end
 
 function Fdeployed()
 	vec([FLabels(1:9, 1:8, [10:10:90; 91]); FLabels(7:9, 1:8, [40:10:60;]); FLabels(10:10, 1:8, 50:50); FLabels(12:12, 1:4, [10:10:90; 91])] )
 end
+
+
+
+function physicalFlabels()
+	include("numSlots.jl")
+	labels = []
+	for rack in 1:81
+		for level in [10:10:90; 91]
+			slots = 8
+			bin = 1
+			while slots > 0
+				label = FLabel(rack, bin, level)
+				for bins in 1:get(numSlots, label, 1)
+					push!(labels, label)
+					slots -= 1
+				end
+				bin += 1
+			end
+		end
+	end
+	labels
+end
+			
+
+	
+	
