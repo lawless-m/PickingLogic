@@ -308,7 +308,7 @@ function wherePut(prtnum, wh_entry_id)
 end
 
 function wherePuts(prtnums, wh_entry_ids)
-	df = qSQL("SELECT DISTINCT prtnum, prtdsc.lngdsc AS dsc, stoloc FROM inventory_view INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%') WHERE prtnum " * @IN(prtnums) * " AND inv_attr_str5 " * @IN(wh_entry_ids) * " AND lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-9]%' or stoloc like 'F-%')")
+	df = qSQL("SELECT DISTINCT prtnum, stoloc FROM inventory_view WHERE prtnum " * @IN(prtnums) * " AND inv_attr_str5 " * @IN(wh_entry_ids) * " AND lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-9]%' or stoloc like 'F-%')")
 	DictVec(Stoloc, :prtnum, df)
 end
 

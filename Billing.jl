@@ -9,6 +9,8 @@ using HIARP
 using XlsxWriter
 using ExcelReaders
 
+partList = prtsInfo()
+
 function byPrtMonth(yr, mn)
 	RPClient.qSQL("
 		with prtmonth(yr, mn, dy, prtnum, untqty, untcas) as (
@@ -38,16 +40,15 @@ end
 function parseReport(repFn)
 	xl = @sheet repFn 1
 	@Xls replace(repFn, ".xlsx", "_PutAways") begin
-		typecodes = typeCodes(unique(xl[2:end,3]))
+		prtnums = unique(xl[2:end,3])
 		ws = add_worksheet!(xls, "Articles")
 		write_row!(ws, 0, 0, ["Article" "Descr" "Typcod" "Typ" "Put aways"])
-		puts = wherePuts(collect(keys(typecodes)), unique(xl[2:end,8])) # prtnums, wh_entry_ids
-		for xr in 2:size(xl, 1)
-			prtnum = xl[xr, 3]
-			c = write_row!(ws, xr, 0, [prtnum typecodes[prtnum][1].descr typecodes[prtnum][1].typcod Merch_cat[typecodes[prtnum][1].typcod]])
-			if haskey(puts, prtnum)
+		puts = wherePuts(prtnums, unique(xl[2:end,8])) # prtnums, wh_entry_ids
+		for sku in prtnums
+			c = write_row!(ws, xr, 0, [prtnum partList[sku].descr partList[sku].typcod Merch_cat[partList[sku].typcod])
+			if haskey(puts, sku)
 				#c += write_row!(ws, xr, c, [puts[prtnum][1].descr])
-				c += write_row!(ws, xr, c, [s.stoloc for s in puts[prtnum]])	
+				c += write_row!(ws, xr, c, [s.stoloc for s in puts[sku]])	
 			end
 		end
 	end
