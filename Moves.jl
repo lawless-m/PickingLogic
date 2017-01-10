@@ -9,6 +9,7 @@ using Base.Dates
 include("utils.jl")
 
 skulocs, locskus, rackskus = fixedLocations()
+items = itemMaster()
 
 function newSheet(wb, name, cols, fmt=nothing)
 	ws = add_worksheet!(wb, name)
@@ -28,7 +29,7 @@ function fill_sheet(ws, row, locs, inventory)
 		write!(ws, row, 1, prtnum)
 		if haskey(inventory, prtnum)
 			write!(ws, row, 2, skulocs[parse(Int64, prtnum)][2])
-			write!(ws, row, 3, inventory[prtnum][1].descr)
+			write!(ws, row, 3, items[prtnum].descr)
 			
 			if alreadyPicked(inventory[prtnum], loc)
 				write!(ws, row, 4, "PICKED")

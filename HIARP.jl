@@ -8,7 +8,7 @@ using DataFrames
 
 include("utils.jl")
 
-export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, typeCode, stolocsHUS, typeCodes, wherePuts, HAIItems, BRItems, currentPrtlocs, locAreas, prtsInfo
+export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster
 
 login("credentials.jls")
 setLog(true)
@@ -22,9 +22,8 @@ type Stoloc
 	qty::Int64
 	descr::AbstractString
 	wh_entry_id::AbstractString
-	typcod::AbstractString
 	# don't forget to change show if you change this
-	Stoloc(p, a, s, f, c, q, d, w, t) = new(p, a, s, f, c, q, d, w, t)
+	Stoloc(p, a, s, f, c, q, w) = new(p, a, s, f, c, q, w)
 	function Stoloc(df, r)
 		dns(x)=x
 		dns(x::DataArrays.NAtype)=""
@@ -35,10 +34,15 @@ type Stoloc
 		f = haskey(df, :fifo) ? df[:fifo][r] : DateTime()
 		c = dns(haskey(df, :case_id) ? df[:case_id][r] : "")
 		q = dns(haskey(df, :qty) ? df[:qty][r] : 0)
-		d = dns(haskey(df, :dsc) ? df[:dsc][r] : "")
+		
 		w = dns(haskey(df, :wh_entry_id) ? df[:wh_entry_id][r] : "")
-		t = dns(haskey(df, :typcod) ? df[:typcod][r] : "")
-		new(p, a, s, f, c, q, d, w, t)
+		if haskey(df, :dsc)
+			@printf STDERR "dsc in query\n"
+		end
+		if haskey(df, :typcod)
+			@printf STDERR "typcod in query\n"
+		end
+		new(p, a, s, f, c, q, w)
 	end
 end
 
@@ -63,7 +67,7 @@ type Part
 end
 
 function show(io::IO, s::Stoloc)
-	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d descr:%s wh_entry_id:%s typcod:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.descr s.wh_entry_id s.typcod
+	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.wh_entry_id
 end
 
 macro IN(a)
@@ -122,18 +126,21 @@ function inventory()
 end
 
 function item(prtnum)
+	@printf STDERR "HIARP.item used\n"
 	qMoca("list parts WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id='----'", [("prtnum", prtnum)])
 end
 
 function typeCode(prtnum)
+	@printf STDERR "HIARP.typeCode used\n"
 	qSQL("SELECT typcod from prtmst WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id_tmpl='----'", [("prtnum", prtnum)])[:typcod][1]
 end
 
-function prtsInfo()
-	df = qSQL("SELECT DISTINCT prtnum, typcod, prtfam
-	FROM prtmst 
-	WHERE prt_client_id ='HUS' AND wh_id_tmpl='----'")
-	prts = DictMap(Part, :prtnum, df)
+
+function prtNames()
+	qSQL("SELECT DISTINCT colval, lngdsc FROM prtdsc WHERE colval LIKE '%|HUS|----'")
+end	
+
+function fillNames(prts::Dict{AbstractString, Part}) # by prtnum
 	names = prtNames()
 	for r in 1:size(names[1], 1)
 		if haskey(prts, names[:colval][r][1:end-9])
@@ -142,19 +149,15 @@ function prtsInfo()
 	end
 	prts
 end
-function prtsInfo(prtnums)
-	df = qSQL("SELECT DISTINCT prtnum, typcod, prtfam, prtdsc.lngdsc AS dsc
-	FROM prtmst INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(prtmst.prtnum, '|HUS|%')
-	WHERE prtnum " * @IN(prtnums) * " AND prt_client_id ='HUS' AND wh_id_tmpl='----'")
-	DictMap(Part, :prtnum, df)
+
+function itemMaster()
+	df = qSQL("SELECT DISTINCT prtnum, typcod, prtfam FROM prtmst WHERE prt_client_id ='HUS' AND wh_id_tmpl='----'")
+	fillNames(DictMap(Part, :prtnum, df))
 end
-
-function prtNames()
-	qSQL("SELECT DISTINCT colval, lngdsc
-        FROM prtdsc
-        WHERE colval LIKE '%|HUS|----'")
-end	
-
+function itemMaster(prtnums)
+	df = qSQL("SELECT DISTINCT prtnum, typcod, prtfam FROM prtmst WHERE prtnum " * @IN(prtnums) * " AND prt_client_id ='HUS' AND wh_id_tmpl='----'")
+	fillNames(DictMap(Part, :prtnum, df))
+end
 
 function prtnum_stoloc_wh_entry_id()
 	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod in ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')")
@@ -174,16 +177,16 @@ function FIFOStolocsX(prtnums)
 	WITH 
 		fifo(prtnum, wh_entry_id, fifodte, qty, case_id) AS (SELECT prtnum, inv_attr_str5, fifdte, untqty, subnum FROM invdtl)	
 	,	cbi(prtnum, stoloc, wh_entry_id, arecod, untqty) as (SELECT prtnum, stoloc, inv_attr_str5, arecod, untqty from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%')
-	SELECT distinct cbi.arecod as area, cbi.prtnum as prtnum, cbi.stoloc as stoloc, fifo.qty as qty, prtdsc.lngdsc as dsc, fifo.case_id, fifo.fifodte as fifo 
-	FROM cbi INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(cbi.prtnum, '|HUS|%') INNER JOIN fifo on fifo.wh_entry_id=cbi.wh_entry_id
+	SELECT distinct cbi.arecod as area, cbi.prtnum as prtnum, cbi.stoloc as stoloc, fifo.qty as qty, fifo.case_id, fifo.fifodte as fifo 
+	FROM cbi INNER JOIN fifo on fifo.wh_entry_id=cbi.wh_entry_id
 	WHERE fifo.prtnum=cbi.prtnum AND cbi.prtnum IN ($prts) ]"
 	)
 end
 
 function FIFOStolocsDF(prtnums)
 	qSQL("
-	SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc 
-	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
+	SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id 
+	FROM inventory_view
 	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')	
 	AND prtnum " * @IN(prtnums))
 end
@@ -197,15 +200,15 @@ function rackFPrtnums()
 end
 
 function BRItems()
-	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
-	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
+	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id 
+	FROM inventory_view
 	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')"))
 end
 
-function HAIItems()
-	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id , prtdsc.lngdsc AS dsc
-	FROM inventory_view  INNER JOIN prtdsc on prtdsc.colval LIKE CONCAT(inventory_view.prtnum, '|HUS|%')
-	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')"))
+function HUSInventory()
+	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id
+	FROM inventory_view
+	WHERE prt_client_id='HUS' AND lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')"))
 end
 
 function SKUs()
@@ -247,21 +250,17 @@ function orderFreqByQtr()
 		SELECT prtnum, COUNT(*) AS cnt, qtr FROM ords GROUP BY prtnum, qtr")
 end
 
-function itemMaster()
-	qSQL("SELECT prtnum, typcod, prtfam, lngdsc from prtmst where prt_client_id='HUS'")
-	
-end
 
 function currentStolocsDF()
-	qSQL("SELECT distinct CBI.arecod as area, CBI.prtnum as prtnum, CBI.stoloc as stoloc, CBI.untqty as qty, prtdsc.lngdsc as dsc, inv_attr_str5 as wh_entry_id 
-	FROM client_blng_inv AS CBI INNER JOIN prtdsc on prtdsc.colval = CONCAT(CBI.prtnum, '|HUS|MFTZ') 
-	WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
+	qSQL("SELECT distinct arecod as area, prtnum as prtnum, stoloc as stoloc, untqty as qty, inv_attr_str5 as wh_entry_id 
+	FROM client_blng_inv
+	WHERE bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%'")
 end
 
 function locAreas()
-	df = qSQL("SELECT distinct CBI.arecod as area, CBI.stoloc as stoloc
-	FROM client_blng_inv AS CBI
-	WHERE CBI.bldg_id='B1' AND CBI.fwiflg=1 and CBI.shpflg=0 and CBI.stgflg=0 and CBI.stoloc not like 'OST%' and CBI.stoloc not like 'QUA%' and CBI.stoloc not like 'RT%'")
+	df = qSQL("SELECT distinct arecod as area, stoloc as stoloc
+	FROM client_blng_inv
+	WHERE bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%'")
 
 	dct = Dict{AbstractString, AbstractString}()
 	for k in 1:size(df)[1]

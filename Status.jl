@@ -17,8 +17,7 @@ locLabels = collect(keys(locskus))
 
 currStolocs = currentStolocs()
 currLabels = collect(keys(currStolocs))
-
-
+items = itemMaster()
 
 function countif(col, startr, endr, cond)
 	@sprintf "countif(%s:%s, \"%s\")" rc2cell(startr, col) rc2cell(endr, col) cond
@@ -26,7 +25,7 @@ end
 
 function bakerFStatus(ws)
 	labels = allFLabels()
-	deployed = vec([FLabels(1:9, 1:8, [10:10:90; 91]); FLabels(7:9, 1:8, [40:10:60;]); FLabels(10:10, 1:8, 50:50); FLabels(12:12, 1:4, [10:10:90; 91])] )
+	deployed = Fdeployed()
 	currentProd = DictVec(Stoloc, :stoloc, rackFPrtnums())
 	cols = ["Stoloc" "Deployed" "Prtnum" "Descr" "Qty" "Assigned" "WrongProd" "Fill" "Ass&Dep" "Replenishable"]
 	row = startrow = 5
@@ -40,7 +39,7 @@ function bakerFStatus(ws)
 			reass = prtass == "" ? "" : prtin==prtass ? "" : "Yes"
 			fill = reass == "Yes" && prtass != "" ? "Yes" : ""
 			assdep = prtass=="" ? "" : "Yes"
-			write_row!(ws, row, 0, [label "*" prtin item.descr item.qty prtass reass fill assdep ""])
+			write_row!(ws, row, 0, [label "*" prtin items[prtin].descr item.qty prtass reass fill assdep ""])
 		else
 			dep = (label in deployed ? "*":"")
 			fill = prtass == "" ? "":"Yes"

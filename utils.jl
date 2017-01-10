@@ -30,11 +30,24 @@ end
 macro Xls(fn, blk)
 	return quote
 		if $fn[2] == ":"
-			xls = Workbook($fn * ".xlsx")
+			fn = $fn
 		else
-			xls = Workbook("G:/Heinemann/" * $fn * ".xlsx")
+			fn = "G:/Heinemann/" * $fn
 		end
+		
+		if isfile(fn * ".xlsx")
+			@printf STDERR "%s exists\n" fn * ".xlsx"
+		end
+		xls = Workbook(fn * ".xlsx")
 		$blk
+		try 
+			fid = open(fn * ".xlsx", "w")
+			close(fid)
+		catch
+			fn = fn * replace(string(now()), ':', '-') * ".xlsx"
+			@printf STDERR "Permission denied so writing to %s\n" fn
+			xls.py[:filename] = fn
+		end
 		close(xls)
 	end
 end
@@ -248,4 +261,8 @@ end
 
 function FLabels(racks, bins, levels)
 	vec([@sprintf("F-%02d-%02d-%02d", r, l, b) for r in racks, b in bins, l in levels])
+end
+
+function Fdeployed()
+	vec([FLabels(1:9, 1:8, [10:10:90; 91]); FLabels(7:9, 1:8, [40:10:60;]); FLabels(10:10, 1:8, 50:50); FLabels(12:12, 1:4, [10:10:90; 91])] )
 end

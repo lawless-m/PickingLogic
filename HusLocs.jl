@@ -28,11 +28,11 @@ z2(n) = @sprintf "%02d" n
 skulocs, locskus, rackskus = skuLocations()
 
 curr = currentStolocs()
-partList = prtsInfo()
+items = itemMaster()
 
 
 function merch(prtnum)
-	prt = get(partList, prtnum, HIARP.Part())
+	prt = get(items, prtnum, HIARP.Part())
 	if prt.prtnum == prtnum
 		prt.typcod, get(Merch_cat, prt.typcod, "")
 	else
@@ -41,7 +41,7 @@ function merch(prtnum)
 end
 
 function family(prtnum)
-	prt = get(partList, prtnum, HIARP.Part())
+	prt = get(items, prtnum, HIARP.Part())
 	if prt.prtnum == prtnum
 		prt.family, get(Familes, prt.family, "")
 	else
@@ -94,7 +94,7 @@ end
 function writeLoc(curr, sheets, rack, loc, area)
 	if haskey(curr, loc)
 		sto = curr[loc][1]
-		data = [area loc sto.prtnum sto.descr sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...]
+		data = [area loc sto.prtnum items[sto.prtnum] sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...]
 	else
 		data = [area loc]					
 	end

@@ -10,12 +10,13 @@ using XlsxWriter
 
 include("utils.jl")
 
-currStolocs = HAIItems()
+currStolocs = HUSInventory()
 currLabels = collect(keys(currStolocs))
 
 skulocs, locskus, rackskus = fixedLocations()
 locLabels = collect(keys(locskus))
-partList = prtsInfo()
+items = itemMaster()
+deployed = Fdeployed()
 
 bakers = BLabels()
 
@@ -28,6 +29,10 @@ for (loc, sto) in currStolocs
 	@push!(hailocs, sto[1].prtnum, sto[1])
 end
 
+macro FLTtester(istester, prtnums)
+	:(filter((p)->$istester==(items[p].typcod[1] == 'T'), $prtnums))
+end
+
 function prtLocs(prts, ws, tester=false)
 	set_column!(ws, "A:A", 35)
 	set_column!(ws, "B:Z", 10)
@@ -36,20 +41,11 @@ function prtLocs(prts, ws, tester=false)
 	write_row!(ws, row-1, 0, ["SKU" "#Locations" "Locations"])
 	numlocs = 0
 	numprts = 0
-	for p in sort(collect(keys(prts)), lt=(a, b)->length(prts[a]) < length(prts[b]), rev=true)		
-		if tester 
-			if partList[p].typcod[1] != 'T'
-				continue
-			end
-		else
-			if partList[p].typcod[1] == 'T'
-				continue
-			end
-		end
+	for p in sort(@FLTtester(tester, collect(keys(prts))), lt=(a, b)->length(prts[a]) < length(prts[b]), rev=true)
 		numprts += 1
 		stos = prts[p]
 		numlocs += length(stos)
-		write_column!(ws, row, 0, [p stos[1].descr])
+		write_column!(ws, row, 0, [p items[p].descr])
 		write!(ws, row, 1, length(stos))
 		write_row!(ws, row, 2, [s.stoloc for s in stos])
 		write_column!(ws, row+1, 1, ["Qty" "Age"])
@@ -65,42 +61,72 @@ function prtLocs(prts, ws, tester=false)
 	write_row!(ws, 1, 0, [numprts numlocs])
 end
 
+function assigned(ws, c, row, fifo, prts, sku, loc, bold)
+	nxts = FIFOSort(fifo[sku])
+	locs = [s.stoloc for s in prts[sku]]
+		
+	if length(nxts) == 0
+		return (0, 0)
+	end
+	if length(locs) > 0 && nxts[1].stoloc == locs[1]
+		write!(ws, row, c, nxts[1].stoloc, nxts[1] == loc ? italic : bold)
+		write_row!(ws, row, c+1, [s.stoloc for s in nxts[2:end]])
+		return (1, 1)
+	else
+		if nxts[1] == loc
+			write!(ws, row, c, nxts[1].stoloc, italic)
+		else
+			write!(ws, row, c, nxts[1].stoloc)
+		end
+		write_row!(ws, row, c+1, [s.stoloc for s in nxts[2:end]])
+		return (1, 0)
+	end
+end
+
 function swapIns(prts, wb, ws)
 	sources = 0
 	fifosources = 0
+	replen = 0
 	row = 4
 	bold = add_format!(wb, Dict("bold"=>true))
-	write_row!(ws, row-1, 0, ["Location", "SKU", "Rack Source"])
+	italic = add_format!(wb, Dict("italic"=>true))
+	write_row!(ws, row-1, 0, ["Location", "SKU", "Deployed", "Locations"])
 	
 	cs = currentPrtlocs()
 	fifo = FIFOStolocs(collect(keys(cs)), :prtnum)
 	
-	for loc in sort(collect(keys(locskus)))
+	row -= 1
+	for loc in ["F-01-20-06", "F-01-20-07", "F-01-20-08", "F-01-30-01", "F-01-30-02", "F-01-30-03", "F-01-30-04", "F-01-30-05", "F-01-30-06"] #sort(collect(keys(locskus)))
 		if loc[1] != 'F'
 			continue
 		end
+		row += 1
 		sku = locskus[loc]
 
+		c = 0
 		write!(ws, row, 0, loc)
-		write!(ws, row, 1, sku)
-		if haskey(prts, sku)
-			nxts = FIFOSort(fifo[sku])
-			locs = [s.stoloc for s in prts[sku]]
-	
-			sources += 1
-				
-			if nxts[1].stoloc == locs[1]
-				write!(ws, row, 2, nxts[1].stoloc, bold)
-				write_row!(ws, row, 3, [s.stoloc for s in nxts[2:end]])
-				fifosources += 1
-			else
-				write_row!(ws, row, 2, [s.stoloc for s in nxts])
+		c += 1
+		write!(ws, row, c, sku)
+		c += 1	
+
+		if loc in deployed
+			write!(ws, row, c, "*")
+		else
+			write!(ws, row, c, "")
+		end
+		c += 1
+			
+		if haskey(prts, sku)	
+			s, f  = assigned(ws, c, row, fifo, prts, sku, loc, bold)
+			sources += s
+			fifosources += f
+			if loc in deployed
+				replen += 1
 			end
 		end
-		row += 1
 	end
-	write_row!(ws, 0, 0, ["In Rack Sources" "FIFO in rack"])
-	write_row!(ws, 1, 0, [sources fifosources])
+	write_row!(ws, 0, 0, ["#SKUs in Stock" "#FIFO in Rack" "#Replenishable"])
+	write_row!(ws, 1, 0, [sources fifosources replen])
 end
 
 @Xls "swap_and_consolidate" begin
@@ -108,13 +134,7 @@ end
 	prtLocs(hailocs, add_worksheet!(xls, "Non Testers, All"))
 	prtLocs(bakerlocs, add_worksheet!(xls, "Testers, Bakers"), true)
 	prtLocs(hailocs, add_worksheet!(xls, "Testers, All"), true)
-	
-	#swapIns(hailocs, xls, add_worksheet!(xls, "Swap Ins"))
+	swapIns(bakerlocs, xls, add_worksheet!(xls, "Swap Ins"))
+	swapIns(hailocs, xls, add_worksheet!(xls, "Replenish"))
 end
 
-
-
-
-			
-	
-	

@@ -12,6 +12,8 @@ MVO = readtable("g:/Heinemann/MVOrchestra.tab.txt", separator='\t', eltypes=[UTF
 
 curr = FIFOStolocs(MVO[:Prtnum], :prtnum)
 
+items = itemMaster()
+
 @fid "transfers/MVOrchestra_new_skus.txt" begin
 	newSkus = size(setdiff(MVO[:Prtnum], collect(keys(curr))), 1)
 	for prt in setdiff(MVO[:Prtnum], collect(keys(curr)))
@@ -31,7 +33,7 @@ end
 		# inv = @sprintf "%s\t%s\t%d\t%S" fst.stoloc fst.case_id fst.qty fst.fifo
 		row = MVO[MVO[:Prtnum] .== prt, :]
 		
-		@printf fid "%s\t%s\t%d\t%s\t%d\t%d\t%d\t%S\n" loc.prtnum loc.descr row[:ORDERED][1] loc.stoloc loc.qty length(curr[prt]) infifo Date(prevOrders(prt)[1]) 
+		@printf fid "%s\t%s\t%d\t%s\t%d\t%d\t%d\t%S\n" loc.prtnum items[loc.prtnum].descr row[:ORDERED][1] loc.stoloc loc.qty length(curr[prt]) infifo Date(prevOrders(prt)[1]) 
 	end
 end
 

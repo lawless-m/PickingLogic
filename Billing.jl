@@ -9,7 +9,7 @@ using HIARP
 using XlsxWriter
 using ExcelReaders
 
-partList = prtsInfo()
+items = itemMaster()
 
 function byPrtMonth(yr, mn)
 	RPClient.qSQL("
@@ -45,9 +45,8 @@ function parseReport(repFn)
 		write_row!(ws, 0, 0, ["Article" "Descr" "Typcod" "Typ" "Put aways"])
 		puts = wherePuts(prtnums, unique(xl[2:end,8])) # prtnums, wh_entry_ids
 		for sku in prtnums
-			c = write_row!(ws, xr, 0, [prtnum partList[sku].descr partList[sku].typcod Merch_cat[partList[sku].typcod])
+			c = write_row!(ws, xr, 0, [prtnum items[sku].descr items[sku].typcod Merch_cat[items[sku].typcod])
 			if haskey(puts, sku)
-				#c += write_row!(ws, xr, c, [puts[prtnum][1].descr])
 				c += write_row!(ws, xr, c, [s.stoloc for s in puts[sku]])	
 			end
 		end

@@ -31,7 +31,7 @@ locLabels = collect(keys(locskus))
 currStolocs = currentStolocs()
 currLabels = collect(keys(currStolocs))
 
-const skus = SKUs()
+const skus = itemMaster()
 const Prtnums = collect(keys(skus))
 const PickCountsByQtr = DictVec(Velq, :prtnum, HIARP.orderFreqByQtr()) # prtnum => Vector{.qtr .count}
 const PickCounts = HIARP.orderFreq() # prtnum => pickCount
