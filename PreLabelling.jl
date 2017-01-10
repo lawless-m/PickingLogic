@@ -10,13 +10,12 @@ using XlsxWriter
 
 include("utils.jl")
 
-
-
 currStolocs = HAIItems()
 currLabels = collect(keys(currStolocs))
 
 skulocs, locskus, rackskus = fixedLocations()
 locLabels = collect(keys(locskus))
+partList = prtsInfo()
 
 bakers = BLabels()
 
@@ -28,7 +27,6 @@ for (loc, sto) in currStolocs
 	end
 	@push!(hailocs, sto[1].prtnum, sto[1])
 end
-typcods = typeCodes(collect(keys(hailocs)))
 
 function prtLocs(prts, ws, tester=false)
 	set_column!(ws, "A:A", 35)
@@ -40,11 +38,11 @@ function prtLocs(prts, ws, tester=false)
 	numprts = 0
 	for p in sort(collect(keys(prts)), lt=(a, b)->length(prts[a]) < length(prts[b]), rev=true)		
 		if tester 
-			if typcods[p][1].typcod[1] != 'T'
+			if partList[p].typcod[1] != 'T'
 				continue
 			end
 		else
-			if typcods[p][1].typcod[1] == 'T'
+			if partList[p].typcod[1] == 'T'
 				continue
 			end
 		end
@@ -106,11 +104,11 @@ function swapIns(wb, ws)
 end
 
 @Xls "consolidate_testers" begin
-	#prtLocs(bakerlocs, add_worksheet!(xls, "Multi Bins"))
-	#prtLocs(bakerlocs, add_worksheet!(xls, "Multi Tester Bins"), true)
+	prtLocs(bakerlocs, add_worksheet!(xls, "Multi Bins"))
+	prtLocs(bakerlocs, add_worksheet!(xls, "Multi Tester Bins"), true)
 	prtLocs(hailocs, add_worksheet!(xls, "All Testers"), true)
 	
-	#swapIns(xls, add_worksheet!(xls, "Swap Ins"))
+	swapIns(xls, add_worksheet!(xls, "Swap Ins"))
 end
 
 
