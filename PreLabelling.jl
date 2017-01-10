@@ -33,7 +33,7 @@ function prtLocs(prts, ws, tester=false)
 	set_column!(ws, "B:Z", 10)
 	now = today()
 	row = 5
-	write_row!(ws, row-1, 0, ["Prtnum" "#Locations" "Locations"])
+	write_row!(ws, row-1, 0, ["SKU" "#Locations" "Locations"])
 	numlocs = 0
 	numprts = 0
 	for p in sort(collect(keys(prts)), lt=(a, b)->length(prts[a]) < length(prts[b]), rev=true)		
@@ -61,16 +61,16 @@ function prtLocs(prts, ws, tester=false)
 		end
 		row += 3
 	end
-	write_row!(ws, 0, 0, ["#Prtnums" "#Locations"])
+	write_row!(ws, 0, 0, ["#SKUs" "#Locations"])
 	write_row!(ws, 1, 0, [numprts numlocs])
 end
 
-function swapIns(wb, ws)
+function swapIns(prts, wb, ws)
 	sources = 0
 	fifosources = 0
 	row = 4
 	bold = add_format!(wb, Dict("bold"=>true))
-	write_row!(ws, row-1, 0, ["Location", "Prtnum", "Rack Source"])
+	write_row!(ws, row-1, 0, ["Location", "SKU", "Rack Source"])
 	
 	cs = currentPrtlocs()
 	fifo = FIFOStolocs(collect(keys(cs)), :prtnum)
@@ -103,12 +103,13 @@ function swapIns(wb, ws)
 	write_row!(ws, 1, 0, [sources fifosources])
 end
 
-@Xls "consolidate_testers" begin
-	prtLocs(bakerlocs, add_worksheet!(xls, "Multi Bins"))
-	prtLocs(bakerlocs, add_worksheet!(xls, "Multi Tester Bins"), true)
-	prtLocs(hailocs, add_worksheet!(xls, "All Testers"), true)
+@Xls "swap_and_consolidate" begin
+	prtLocs(bakerlocs, add_worksheet!(xls, "Non Testers, Bakers"))
+	prtLocs(hailocs, add_worksheet!(xls, "Non Testers, All"))
+	prtLocs(bakerlocs, add_worksheet!(xls, "Testers, Bakers"), true)
+	prtLocs(hailocs, add_worksheet!(xls, "Testers, All"), true)
 	
-	swapIns(xls, add_worksheet!(xls, "Swap Ins"))
+	#swapIns(hailocs, xls, add_worksheet!(xls, "Swap Ins"))
 end
 
 
