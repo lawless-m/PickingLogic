@@ -15,39 +15,63 @@ i64(a::AbstractString) = a=="TBD" ? -1 : parse(Int64, a)
 skulocs, locskus, rackskus = skuLocations()
 locLabels = collect(keys(locskus))
 
-currStolocs = currentStolocs()
-currLabels = collect(keys(currStolocs))
+inv_by_loc = DictVec2Map(HUSInventory()) #currentStolocs()
+used_locs = collect(keys(inv_by_loc))
 items = itemMaster()
 
 function countif(col, startr, endr, cond)
 	@sprintf "countif(%s:%s, \"%s\")" rc2cell(startr, col) rc2cell(endr, col) cond
 end
 
+
+macro write(d)
+	:(col += write!(ws, row, col, $d))
+end
+macro Yes(b)
+	:(col += write!(ws, row, col, $b?"Yes":""))
+end
+	
+macro nonz(n)
+	:(col += write!(ws, row, col, $n>0?$n:""))
+end
+
+macro nonE(t)
+	:(col += write!(ws, row, col, $t==""?"EMPTY":$t))
+end
+
+macro descr(prtnum)
+	:(col += write!(ws, row, col, get(items, $prtnum, Part()).descr))
+end
+
+
 function bakerFStatus(ws)
-	labels = allFLabels()
+	fLocs = allFLabels()
 	deployed = Fdeployed()
+	used = physicalFlabels()
 	currentProd = DictVec(Stoloc, :stoloc, rackFPrtnums())
-	cols = ["Stoloc" "Deployed" "Prtnum" "Descr" "Qty" "Assigned" "WrongProd" "Fill" "Ass&Dep" "Replenishable"]
+	cols = ["Stoloc" "Deployed" "In Use" "Prtnum" "Descr" "Qty" "Assigned" "WrongProd" "Fill" "Ass&Dep" "Replenishable"]
 	row = startrow = 5
 	write_row!(ws, startrow-1, 0, cols)
-	for label in sort(labels)
-		prtass = string(get(locskus, label, ""))
-		
-		if haskey(currStolocs, label)
-			item = currStolocs[label][1]
-			prtin = string(item.prtnum)
-			reass = prtass == "" ? "" : prtin==prtass ? "" : "Yes"
-			fill = reass == "Yes" && prtass != "" ? "Yes" : ""
-			assdep = prtass=="" ? "" : "Yes"
-			write_row!(ws, row, 0, [label "*" prtin items[prtin].descr item.qty prtass reass fill assdep ""])
-		else
-			dep = (label in deployed ? "*":"")
-			fill = prtass == "" ? "":"Yes"
-			depass = dep == "*" && prtass != "" ? "Yes" : ""
-			write_row!(ws, row, 0, [label dep "EMPTY" "" "" prtass "" fill depass depass])
-		end
+	
+	for loc in sort(fLocs)
+		col = 0
+		@write loc
+		dep = loc in deployed ? "*" : "" # has this bin been deployed
+		@write dep
+		@write loc in used ? "*":""
+		item = get(inv_by_loc, loc, Stoloc()) # item stored this location
+		@nonE item.prtnum
+		@descr item.prtnum
+		@nonz item.qty
+		prtass = string(get(locskus, loc, "")) # prtnum assigned to this location
+		@write prtass
+		@Yes !(item.prtnum != "" && item.prtnum == prtass) # does this product need moving ?
+		@Yes item.prtnum != prtass # does this space need filling 
+		@Yes dep=="*" && prtass != "" # is the bin deployed and assigned
+		@Yes dep=="*" && item.prtnum=="" # can we replenish this bin i.e. deployed and empty
 		row += 1
 	end
+	
 	row -= 1
 	write_row!(ws, 0, 0, ["Locations" "Deployed" "Empty" "Assigned" "Ass&Dep" "WrongProd" "NeedFill" "Replenishable"]) 
 	write!(ws, 2, 0, "%") 
@@ -77,9 +101,9 @@ function bakerExisting(ws, c)
 	write_row!(ws, 3, c, ["Stoloc" "Prtnum" "Descr" "Qty"])
 	row = startrow = 5
 	for label in sort(labels)
-		if haskey(currStolocs, label)
-			item = currStolocs[label][1]
-			write_row!(ws, row, c, [label string(item.prtnum) item.descr item.qty])
+		if haskey(inv_by_loc, label)
+			item = inv_by_loc[label]
+			write_row!(ws, row, c, [label item.prtnum items[item.prtnum].descr item.qty])
 		else
 			write_row!(ws, row, c, [label "EMPTY"])
 		end

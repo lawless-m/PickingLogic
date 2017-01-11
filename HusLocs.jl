@@ -20,12 +20,12 @@ function newSheet(wb, rack, Cols, fmt)
 	freeze_panes!(ws, 1, 0)
 	ws
 end
-z3(n) = @sprintf "%03d" n
-z2(n) = @sprintf "%02d" n
 
 
 
 skulocs, locskus, rackskus = skuLocations()
+
+phys = physicalHUS()
 
 curr = currentStolocs()
 items = itemMaster()
@@ -90,11 +90,14 @@ function racklist(stolocs)
 	racks
 end
 
+macro INphys(x)
+	:($x in phys ? "*" : "")
+end
 
 function writeLoc(curr, sheets, rack, loc, area)
 	if haskey(curr, loc)
 		sto = curr[loc][1]
-		data = [area loc sto.prtnum items[sto.prtnum] sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...]
+		data = [area loc @INphys(loc) in phys ? "*":"" sto.prtnum items[sto.prtnum] sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...]
 	else
 		data = [area loc]					
 	end
@@ -123,7 +126,7 @@ function allstolocs()
 	locareas = locAreas()
 	d = Dates.format(today(), "u_d")
 	@Xls "HUSLocs_$d" begin
-		Cols = [("Area", 10) ("Loc", 12) ("prtnum", 10) ("Descr", 35) ("Qty", 5) ("Fixed Loc", 11) ("Typecode", 12) ("Category", 25) ("Famcode", 12) ("Family", 25)]
+		Cols = [("Area", 10) ("Loc", 12) ("Phys", 5) ("prtnum", 10) ("Descr", 35) ("Qty", 5) ("Fixed Loc", 11) ("Typecode", 12) ("Category", 25) ("Famcode", 12) ("Family", 25)]
 		bold = add_format!(xls ,Dict("bold"=>true))
 		date_format = add_format!(xls, Dict("num_format"=>"d mmmm yyyy"))
 		sheets = Dict{AbstractString, Tuple{Worksheet, Int64}}() # name => (ws, rownum)

@@ -8,7 +8,7 @@ using DataFrames
 
 include("utils.jl")
 
-export FIFOSort, Stoloc, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster
+export FIFOSort, Stoloc, Part, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster
 
 login("credentials.jls")
 setLog(true)
@@ -18,12 +18,13 @@ type Stoloc
 	area::AbstractString
 	stoloc::AbstractString
 	fifo::DateTime
+	lodnum::AbstractString
 	case_id::AbstractString
 	qty::Int64
-	descr::AbstractString
 	wh_entry_id::AbstractString
 	# don't forget to change show if you change this
-	Stoloc(p, a, s, f, c, q, w) = new(p, a, s, f, c, q, w)
+	Stoloc() = new("", "", "", DateTime(), "", "", 0, "")
+	Stoloc(p, a, s, f, l, c, q, w) = new(p, a, s, f, l, c, q, w)
 	function Stoloc(df, r)
 		dns(x)=x
 		dns(x::DataArrays.NAtype)=""
@@ -32,17 +33,18 @@ type Stoloc
 		a = dns(haskey(df, :area) ? df[:area][r] : "")
 		s = dns(haskey(df, :stoloc) ? df[:stoloc][r] : "")
 		f = haskey(df, :fifo) ? df[:fifo][r] : DateTime()
+		l = dns(haskey(df, :lodnum) ? df[:lodnum][r] : "")
 		c = dns(haskey(df, :case_id) ? df[:case_id][r] : "")
 		q = dns(haskey(df, :qty) ? df[:qty][r] : 0)
-		
 		w = dns(haskey(df, :wh_entry_id) ? df[:wh_entry_id][r] : "")
+		
 		if haskey(df, :dsc)
 			@printf STDERR "dsc in query\n"
 		end
 		if haskey(df, :typcod)
 			@printf STDERR "typcod in query\n"
 		end
-		new(p, a, s, f, c, q, w)
+		new(p, a, s, f, l, c, q, w)
 	end
 end
 
@@ -67,7 +69,7 @@ type Part
 end
 
 function show(io::IO, s::Stoloc)
-	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S case_id:%s qty:%d wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.case_id s.qty s.wh_entry_id
+	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S lodnum:%s case_id:%s qty:%d wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.lodnum s.case_id s.qty s.wh_entry_id
 end
 
 macro IN(a)
@@ -160,7 +162,7 @@ function itemMaster(prtnums)
 end
 
 function prtnum_stoloc_wh_entry_id()
-	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod in ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')")
+	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE prt_client_id ='HUS' AND wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod in ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')")
 end
 
 function columns(tbl)
@@ -176,7 +178,7 @@ function FIFOStolocsX(prtnums)
 	qMoca("[ 
 	WITH 
 		fifo(prtnum, wh_entry_id, fifodte, qty, case_id) AS (SELECT prtnum, inv_attr_str5, fifdte, untqty, subnum FROM invdtl)	
-	,	cbi(prtnum, stoloc, wh_entry_id, arecod, untqty) as (SELECT prtnum, stoloc, inv_attr_str5, arecod, untqty from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%')
+	,	cbi(prtnum, stoloc, wh_entry_id, arecod, untqty) as (SELECT prtnum, stoloc, inv_attr_str5, arecod, untqty from client_blng_inv WHERE prt_client_id ='HUS' AND wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%')
 	SELECT distinct cbi.arecod as area, cbi.prtnum as prtnum, cbi.stoloc as stoloc, fifo.qty as qty, fifo.case_id, fifo.fifodte as fifo 
 	FROM cbi INNER JOIN fifo on fifo.wh_entry_id=cbi.wh_entry_id
 	WHERE fifo.prtnum=cbi.prtnum AND cbi.prtnum IN ($prts) ]"
@@ -196,7 +198,7 @@ function FIFOStolocs(prtnums, k::Symbol)
 end
 
 function rackFPrtnums()
-	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod=@AREA", [("AREA", "BBINA01")]) 
+	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE prt_client_id ='HUS' AND wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod=@AREA", [("AREA", "BBINA01")]) 
 end
 
 function BRItems()
@@ -254,13 +256,13 @@ end
 function currentStolocsDF()
 	qSQL("SELECT distinct arecod as area, prtnum as prtnum, stoloc as stoloc, untqty as qty, inv_attr_str5 as wh_entry_id 
 	FROM client_blng_inv
-	WHERE bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%'")
+	WHERE prt_client_id='HUS' AND wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%'")
 end
 
 function locAreas()
 	df = qSQL("SELECT distinct arecod as area, stoloc as stoloc
 	FROM client_blng_inv
-	WHERE bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%'")
+	WHERE prt_client_id='HUS' AND wh_id='MFTZ'  AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'RT%'")
 
 	dct = Dict{AbstractString, AbstractString}()
 	for k in 1:size(df)[1]
@@ -299,11 +301,11 @@ function prevOrders(prtnum, cnt=5)
 end
 
 function stolocsHUS()
-	collect(qSQL("select distinct stoloc from locmst where (wh_id ='MIA' or wh_id='MFTZ')")[:stoloc])
+	collect(qSQL("SELECT distinct stoloc FROM locmst WHERE (wh_id ='MIA' or wh_id='MFTZ')")[:stoloc])
 end
 
 function wherePut(prtnum, wh_entry_id)
-	qSQL("select distinct stoloc from inventory_view where prtnum=@prtnum and inv_attr_str5=@whid and lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')", [("prtnum", prtnum), ("whid", wh_entry_id)])
+	qSQL("SELECT distinct stoloc from inventory_view where prtnum=@prtnum and inv_attr_str5=@whid and lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')", [("prtnum", prtnum), ("whid", wh_entry_id)])
 end
 
 function wherePuts(prtnums, wh_entry_ids)

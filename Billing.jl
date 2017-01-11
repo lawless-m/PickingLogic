@@ -18,7 +18,7 @@ function byPrtMonth(yr, mn)
 			FROM invdtl
 			WHERE prt_client_id='HUS'
 			)
-		select dy, prtnum, untqty, untcas from prtmonth where yr='$yr' and mn='$mn' order by dy, prtnum
+		SELECT dy, prtnum, untqty, untcas FROM prtmonth where yr='$yr' and mn='$mn' order by dy, prtnum
 		")
 end
 

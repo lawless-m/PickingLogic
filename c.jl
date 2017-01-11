@@ -1,18 +1,13 @@
 
 cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, abspath("GitHub/PickingLogic/"))
+unshift!(LOAD_PATH, abspath("GitHub/XlsxWriter.jl/"))
 
 
-using HIARP
-
+using XlsxWriter
 
 include("utils.jl")
-include("merch_cats.jl")
-
-skulocs, locskus, rackskus = skuLocations()
-
-curr = currentStolocs()
-typecodes = typeCodesSerial()
-
-println(typecodes)
+for l in physicalFlabels()
+	println(l)
+end
 

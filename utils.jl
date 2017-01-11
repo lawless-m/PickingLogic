@@ -99,6 +99,15 @@ function DictMap(T, k, df)
 	dd
 end
 
+function DictVec2Map(dvec)
+	ks = collect(keys(dvec))
+	dmap = Dict{eltype(ks), eltype(dvec[ks[1]])}()
+	for k in ks
+		dmap[k] = dvec[k][1]
+	end
+	dmap
+end
+
 function i64DictVec(T, k, df)
 	dd = Dict{Int64, Vector{T}}() # Int64 => Vector{T}
 	for r in 1:size(df[1], 1)
@@ -240,6 +249,9 @@ function deXLS(fn)
 	close(fid)
 end
 
+z3(n) = @sprintf "%03d" n
+z2(n) = @sprintf "%02d" n
+
 function BLabels()
 	[ []
 	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 1:1, l in 10:10:60, b in [1:24; 31:55]])	
@@ -259,7 +271,7 @@ function FLabel(r, b, l)
 end
 
 function FLabels(racks, bins, levels)
-	vec([FLabel(r, l, b) for r in racks, b in bins, l in levels])
+	vec([FLabel(r, b, l) for r in racks, b in bins, l in levels])
 end
 
 function allFLabels()
@@ -292,6 +304,113 @@ function physicalFlabels()
 	end
 	labels
 end
+
+
+function threebythree(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%03d-%03d-%03d" r l b)
+	end
+	locs
+end
+
+function twobytwo(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%02d-%02d" r l b)
+	end
+	locs
+end
+
+
+function twobytwobythree(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%02d-%03d" r l b)
+	end
+	locs
+end
+
+function twobythreebythree(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%03d-%03d" r l b)
+	end
+	locs
+end
+
+function twobythreebytwo(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%03d-%03d" r l b)
+	end
+	locs
+end
+
+
+function twobytwoby77alpha(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%03d-77%c" r l b)
+	end
+	locs
+end
+
+
+function physicalHUS()
+	locs = []
+	push!(locs, threebythree(251:252, 10:10:40, 1:50))
+	
+	push!(locs, threebythree(253:256, 10:10:30, 1:60))
+	push!(locs, threebythree(253:256, 40:10:50, 1:20))
+	
+	push!(locs, threebythree(257:257, 10:10:30, 1:55))
+	push!(locs, threebythree(257:257, 40:10:50, 1:22))
+	
+	push!(locs, threebythree(258:258, 10:10:60, 1:60))
+	
+	push!(locs, threebythree(281:281, 10:10:10, 1:40))
+	push!(locs, threebythree(281:281, 20:10:20, 1:50))
+	push!(locs, threebythree(281:281, 30:10:40, 1:40))
+	
+	push!(locs, threebythree(282:283, 10:10:40, 1:40))
+	
+	@printf STDERR "284- is a problem\n"
+	
+	push!(locs, threebythree(285:285, 10:10:40, 1:9))
+	
+	push!(locs, twobytwo(34:41, 10:10:40, 1:15))
+	
+	push!(locs, twobytwo(82:82, 10:10:40, 1:44))
+	push!(locs, twobytwo(81:81, 15:15, 1:35))
+	push!(locs, twobytwo(82:82, 15:15, 1:4))
+	push!(locs, twobytwo(82:82, 15:15, 29:44))
+	
+	push!(locs, twobytwo(83:83, [10:10:40; 15], 1:48))
+	push!(locs, twobytwobythree(83:83, 10:10:50, 1:10))
+	
+	push!(locs, twobytwo(84:84, 10:10, 1:125))
+	push!(locs, twobytwo(84:84, 15:15, 1:98))
+	push!(locs, twobytwo(84:84, 20:20, 1:136))
+	push!(locs, twobytwo(84:84, 30:30, 1:130))
+	
+	
+	@printf STDERR "84- 50 / 60 is a problem\n"
+	
+	push!(locs, twobythreebytwo(85:85, 10:10:40, 0:0))
+	push!(locs, twobythreebythree(85:85, 10:10:40, 1:24))
+	
+	push!(locs, twobythreebythree(86:86, 10:10:40, 1:24))
+	
+	push!(locs, twobytwo([22; 25], 10:40, 1:52))
+	push!(locs, twobytwo(23:24, 10:40, 1:48))
+	
+	push!(locs, twobytwo(90:90, 10:10, 1:55))
+	
+	push!(locs, twobytwoby77alpha(90:90, 10:10, 'B':'H'))
+	locs
+end
+	
 			
 
 	
