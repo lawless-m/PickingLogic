@@ -53,7 +53,7 @@ type Part
 	typcod::AbstractString
 	family::AbstractString
 	descr::AbstractString
-	Part() = new("", "", "", "")
+	Part() = new("", "", "", "UNKNOWN ITEM")
 	Part(p, t, f, d) = new(p, t, f, d)
 	function Part(df, r)
 		dns(x)=x

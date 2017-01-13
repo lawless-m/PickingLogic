@@ -251,18 +251,68 @@ end
 
 z3(n) = @sprintf "%03d" n
 z2(n) = @sprintf "%02d" n
+function threebythree(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%03d-%03d-%03d" r l b)
+	end
+	locs
+end
+
+function twobytwo(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%02d-%02d" r l b)
+	end
+	locs
+end
+
+
+function twobytwobythree(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%02d-%03d" r l b)
+	end
+	locs
+end
+
+function twobythreebythree(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%03d-%03d" r l b)
+	end
+	locs
+end
+
+function twobythreebytwo(racks, levels, bins)
+	locs = []
+	for r in racks, l in levels, b in bins
+		push!(locs, @sprintf "%02d-%03d-%03d" r l b)
+	end
+	locs
+end
+
+
+function twobytwobyalpha(racks, levels, bins, alpha)
+	locs = []
+	for r in racks, l in levels, b in bins, c in alpha
+		push!(locs, @sprintf "%02d-%02d-%02d%c" r l b c)
+	end
+	locs
+end
 
 function BLabels()
 	[ []
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 1:1, l in 10:10:60, b in [1:24; 31:55]])	
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:3, l in 10:10:60, b in 31:55])	
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 4:8, l in 10:10:60, b in [1:24; 31:55]])	
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 9:19, l in 10:10:60, b in 1:25] 	)
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 3:3, l in 70:70, b in 31:55]  	)
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 4:4, l in 70:70, b in [17:24; 31:55]] )
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 5:7, l in 70:70, b in 31:55]  )
-	;vec(	[@sprintf("%02d-%02d-%02d", r, l, b) for r in 8:11, l in 70:70, b in 1:24]  )	
-	; vec(["03-50-17" "03-70-22" "03-70-23"])
+	;vec(	twobytwo(1, 10:10:60, [1:24; 31:55])	)
+	;vec(	twobytwo(3, 10:10:60, 31:55)	)
+	;vec(	twobytwo(4:8, 10:10:60, [1:24; 31:55])	)
+	;vec(	twobytwo(9:19, 10:10:60,  1:25))
+	;vec(	twobytwo(3, 70, 31:55))
+	;vec(	twobytwo(4, 70,  [1:24; 31:55]))
+	;vec(	twobytwo(5:7, 70, 31:55))
+	;vec(	twobytwo(8:11, 70, 1:24)	)
+	;vec(	twobytwo(13, 70, 1:8)	)
+	; vec(["03-70-22" "03-70-23"])
 	]
 end
 
@@ -306,108 +356,135 @@ function physicalFlabels()
 end
 
 
-function threebythree(racks, levels, bins)
-	locs = []
-	for r in racks, l in levels, b in bins
-		push!(locs, @sprintf "%03d-%03d-%03d" r l b)
-	end
-	locs
-end
-
-function twobytwo(racks, levels, bins)
-	locs = []
-	for r in racks, l in levels, b in bins
-		push!(locs, @sprintf "%02d-%02d-%02d" r l b)
-	end
-	locs
-end
-
-
-function twobytwobythree(racks, levels, bins)
-	locs = []
-	for r in racks, l in levels, b in bins
-		push!(locs, @sprintf "%02d-%02d-%03d" r l b)
-	end
-	locs
-end
-
-function twobythreebythree(racks, levels, bins)
-	locs = []
-	for r in racks, l in levels, b in bins
-		push!(locs, @sprintf "%02d-%03d-%03d" r l b)
-	end
-	locs
-end
-
-function twobythreebytwo(racks, levels, bins)
-	locs = []
-	for r in racks, l in levels, b in bins
-		push!(locs, @sprintf "%02d-%03d-%03d" r l b)
-	end
-	locs
-end
-
-
-function twobytwoby77alpha(racks, levels, bins)
-	locs = []
-	for r in racks, l in levels, b in bins
-		push!(locs, @sprintf "%02d-%03d-77%c" r l b)
-	end
-	locs
-end
-
 
 function physicalHUS()
-	locs = []
-	push!(locs, threebythree(251:252, 10:10:40, 1:50))
+	locs = BLabels()
+	locs = vcat(locs, allFLabels())
 	
-	push!(locs, threebythree(253:256, 10:10:30, 1:60))
-	push!(locs, threebythree(253:256, 40:10:50, 1:20))
+	locs = vcat(locs, threebythree(251:252, 10:10:40, 1:50))
 	
-	push!(locs, threebythree(257:257, 10:10:30, 1:55))
-	push!(locs, threebythree(257:257, 40:10:50, 1:22))
+	locs = vcat(locs, threebythree(251:252, 50:10:60, 1:50))
 	
-	push!(locs, threebythree(258:258, 10:10:60, 1:60))
 	
-	push!(locs, threebythree(281:281, 10:10:10, 1:40))
-	push!(locs, threebythree(281:281, 20:10:20, 1:50))
-	push!(locs, threebythree(281:281, 30:10:40, 1:40))
+	locs = vcat(locs, threebythree(253:256, 10:10:30, 1:60))
+	locs = vcat(locs, threebythree(253:256, 40:10:50, 1:40))
 	
-	push!(locs, threebythree(282:283, 10:10:40, 1:40))
+	locs = vcat(locs, threebythree(257, 10:10:30, 1:55))
+	locs = vcat(locs, threebythree(257, 40:10:50, 1:22))
+	locs = vcat(locs, threebythree(257, 50, 23:31))
+	
+	locs = vcat(locs, threebythree(258, 10:10:60, 1:60))
+	
+	locs = vcat(locs, threebythree(281, 10, 1:40))
+	locs = vcat(locs, threebythree(281, 20:10:20, 1:50))
+	locs = vcat(locs, threebythree(281, 30:10:40, 1:40))
+	
+	locs = vcat(locs, threebythree(282, 10:10:40, 1:40))
 	
 	@printf STDERR "284- is a problem\n"
 	
-	push!(locs, threebythree(285:285, 10:10:40, 1:9))
+	locs = vcat(locs, threebythree(285, 10:10:40, 1:9))
 	
-	push!(locs, twobytwo(34:41, 10:10:40, 1:15))
+	locs = vcat(locs, twobytwo(34:41, 10:10:40, 1:15))
 	
-	push!(locs, twobytwo(82:82, 10:10:40, 1:44))
-	push!(locs, twobytwo(81:81, 15:15, 1:35))
-	push!(locs, twobytwo(82:82, 15:15, 1:4))
-	push!(locs, twobytwo(82:82, 15:15, 29:44))
+	locs = vcat(locs, twobytwo(81:82, 10:10:40, 1:44))
+	locs = vcat(locs, twobytwo(81, 15, 1:35))
+	locs = vcat(locs, twobytwo(82, 15, 1:4))
+	locs = vcat(locs, twobytwo(82, 15, 29:44))
 	
-	push!(locs, twobytwo(83:83, [10:10:40; 15], 1:48))
-	push!(locs, twobytwobythree(83:83, 10:10:50, 1:10))
+	locs = vcat(locs, twobytwo(83, [10:10:40; 15], 1:48))
+	locs = vcat(locs, twobytwobythree(83, 10:10:50, 1:12))
 	
-	push!(locs, twobytwo(84:84, 10:10, 1:125))
-	push!(locs, twobytwo(84:84, 15:15, 1:98))
-	push!(locs, twobytwo(84:84, 20:20, 1:136))
-	push!(locs, twobytwo(84:84, 30:30, 1:130))
+	locs = vcat(locs, twobytwobythree(84, 10, 1:6))
+	locs = vcat(locs, twobytwobythree(84, 20, 1:3))
+	locs = vcat(locs, twobytwobythree(84, 30, 3:6))
+	locs = vcat(locs, twobytwo(84, 10, 1:125))
+	locs = vcat(locs, twobytwo(84, 15, 1:98))
+	locs = vcat(locs, twobytwo(84, 20, 1:136))
+	locs = vcat(locs, twobytwo(84, 30, 1:130))
+	locs = vcat(locs, twobytwo(84, 40, 1:245))
 	
-	
+	locs = vcat(locs, twobytwo(84, 50, 1:125))	
 	@printf STDERR "84- 50 / 60 is a problem\n"
 	
-	push!(locs, twobythreebytwo(85:85, 10:10:40, 0:0))
-	push!(locs, twobythreebythree(85:85, 10:10:40, 1:24))
+	locs = vcat(locs, twobythreebytwo(85, 10:10:40, 0))
+	locs = vcat(locs, twobythreebythree(85, 10:10:40, 1:24))
 	
-	push!(locs, twobythreebythree(86:86, 10:10:40, 1:24))
+	locs = vcat(locs, twobythreebythree(86, 10:10:40, 1:24))
 	
-	push!(locs, twobytwo([22; 25], 10:40, 1:52))
-	push!(locs, twobytwo(23:24, 10:40, 1:48))
+	locs = vcat(locs, twobytwo(87, 20, 23:43))
 	
-	push!(locs, twobytwo(90:90, 10:10, 1:55))
+	# 20s set
+	locs = vcat(locs, twobytwo([22; 25], 10:10:40, 1:52))
+	locs = vcat(locs, twobytwo(23:24, 10:10:40, 1:48))
+	locs = vcat(locs, twobytwo(24, 20, 50:62))
 	
-	push!(locs, twobytwoby77alpha(90:90, 10:10, 'B':'H'))
+	locs = vcat(locs, twobytwo(90, 10, 1:55))
+	
+	
+	locs = vcat(locs, twobytwobyalpha(90, 10, 1:77, 'B':'H'))
+
+	# secure
+	@printf STDERR "Not 100%% on the last in the secure sequence\n"
+	locs = vcat(locs, twobytwo(87, 10, 1:99))
+	
+	locs = vcat(locs, twobytwo(87, 100, 1:200))
+	locs = vcat(locs, twobytwo(87, 110:10:130, 1:120))
+	locs = vcat(locs, twobytwo(87, 140, 20:33))
+	
+	locs = vcat(locs, twobytwobythree(87, 80, 1:130))
+	
+	locs = vcat(locs, twobytwo(89, 50:10:60, 1:128))
+	
+	#testers
+	
+	locs = vcat(locs, twobytwo(15, 150:10:180, 1:48))
+	locs = vcat(locs, twobytwo(15, 190:10:200, 1:70))
+	
+	locs = vcat(locs, twobytwo(18, 10:10:140, 31:55))
+	
+	locs = vcat(locs, twobytwo(19, 10:10:140, 31:53))
+	
+	locs = vcat(locs, twobytwo(17, 10:10:140, 31:53))
+	locs = vcat(locs, twobytwo(17, 140, 47:54))
+	
+	locs = vcat(locs, twobytwo(16, 10:10:140, 31:55))
+	
+	locs = vcat(locs, twobytwo(15, 150:10:180, 1:48))
+	locs = vcat(locs, twobytwo(15, 190:10:200, 1:70))
+	
+	# Chanel
+	locs = vcat(locs, twobytwo(15, 120, 1:90))
+	locs = vcat(locs, twobytwo(15, 130, 1:120))
+	locs = vcat(locs, twobytwo(15, 140, 1:168))
+	
+	
+	# rack 21
+	locs = vcat(locs, twobytwo(91, 10, 1:92))
+	locs = vcat(locs, twobytwo(91, 20, 1:113))
+	locs = vcat(locs, twobytwo(91, 25, 1:38))
+	locs = vcat(locs, twobytwo(91, 30, 1:19))
+	locs = vcat(locs, twobytwobyalpha(91, 10, 1:79, 'B'))
+	
+	locs = vcat(locs, twobytwo(92, 10, 11:17))
+	
+	# rack 22
+	locs = vcat(locs, twobytwo(89, 10, 1:72))
+	locs = vcat(locs, twobytwo(89, 20, 1:98))
+	locs = vcat(locs, twobytwo(89, 30, 19:83))
+	locs = vcat(locs, twobytwo(89, 40, 1:111))
+	locs = vcat(locs, twobytwo(89, 45, 1:19))
+	locs = vcat(locs, twobytwo(89, 45, 53:61))
+	
+	# small cold store
+	
+	locs = vcat(locs, twobytwo(42:43, 10:10:40, 1:24))
+
+	# 20 set for desctruction
+	locs = vcat(locs, twobytwobythree(20, 50, [6; 9; 10]))
+	
+
+	
 	locs
 end
 	

@@ -21,8 +21,6 @@ function newSheet(wb, rack, Cols, fmt)
 	ws
 end
 
-
-
 skulocs, locskus, rackskus = skuLocations()
 
 phys = physicalHUS()
@@ -91,15 +89,20 @@ function racklist(stolocs)
 end
 
 macro INphys(x)
-	:($x in phys ? "*" : "")
+	:(uppercase($x) in phys ? "*" : "")
+end
+
+macro descr(prtnum)
+	:(get(items, $prtnum, Part()).descr)
 end
 
 function writeLoc(curr, sheets, rack, loc, area)
 	if haskey(curr, loc)
 		sto = curr[loc][1]
-		data = [area loc @INphys(loc) in phys ? "*":"" sto.prtnum items[sto.prtnum] sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...]
+		
+		data = [area loc @INphys(loc) sto.prtnum @descr(sto.prtnum) sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...]
 	else
-		data = [area loc]					
+		data = [area loc @INphys(loc)]					
 	end
 	write_row!(sheets[area][1], sheets[area][2], 0, data[2:end])
 	write_row!(sheets[rack][1], sheets[rack][2], 0, data)
