@@ -8,7 +8,7 @@ using DataFrames
 
 include("utils.jl")
 
-export FIFOSort, Stoloc, Part, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster
+export FIFOSort, Stoloc, Part, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster, OrdLine, orderAmntByDay
 
 login("credentials.jls")
 setLog(true)
@@ -53,7 +53,7 @@ type Part
 	typcod::AbstractString
 	family::AbstractString
 	descr::AbstractString
-	Part() = new("", "", "", "UNKNOWN ITEM")
+	Part() = new("", "", "", "")
 	Part(p, t, f, d) = new(p, t, f, d)
 	function Part(df, r)
 		dns(x)=x
@@ -228,10 +228,35 @@ function prtnumOrderFreq()
 	WHERE ord.client_id='HUS' AND ord.wh_id='MFTZ'
 	GROUP BY prtnum")
 	dct = Dict{AbstractString, Int64}()
-	for k in 1:size(df)[1]
+	for k in 1:size(df, 1)
 		dct[df[:prtnum][k]] = df[:cnt][k]
 	end
 	return dct
+end
+
+typealias OrdLine Dict{AbstractString, Dict{Date, Int64}}
+
+function orderAmntByDay(yr)
+	df = qSQL("
+		WITH ords(prtnum, qty, datum) AS (			
+			SELECT prtnum, ordqty, CONVERT(date, entdte)
+			FROM ord_line 
+			WHERE  client_id='HUS' AND wh_id='MFTZ' AND entdte >= '01/01/$yr' AND entdte < '01/01/$(yr + 1)'
+		)
+		SELECT prtnum, SUM(qty) AS qty, datum FROM ords GROUP BY prtnum, datum")
+		
+	ords = OrdLine()
+	for r in 1:size(df, 1)
+		p = df[:prtnum][r]
+		q = df[:qty][r]
+		d = Date(df[:datum][r])
+		
+		if !haskey(ords, p)
+			ords[p] = Dict{Date, Int64}()
+		end
+		ords[p][d] = q
+	end	
+	ords
 end
 
 function orderFreqByMonth()
