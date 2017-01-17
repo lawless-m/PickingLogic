@@ -23,26 +23,33 @@ function countif(col, startr, endr, cond)
 	@sprintf "countif(%s:%s, \"%s\")" rc2cell(startr, col) rc2cell(endr, col) cond
 end
 
-
 macro write(d)
 	:(col += write!(ws, row, col, $d))
 end
+macro writeIF(c, t, f)
+	:(@write $c?$t:$f)
+end
 macro Yes(b)
-	:(col += write!(ws, row, col, $b?"Yes":""))
+	:(@writeIF $b "Yes" "")
 end
-	
-macro nonz(n)
-	:(col += write!(ws, row, col, $n>0?$n:""))
+macro Star(b)
+	:(@writeIF $b "*" "")
 end
-
+macro nonZ(n)
+	:(@writeIF $n>0 $n "")
+end
 macro nonE(t)
-	:(col += write!(ws, row, col, $t==""?"EMPTY":$t))
+	:(@writeIF $t=="" "EMPTY" $t)
 end
-
 macro descr(prtnum)
-	:(col += write!(ws, row, col, get(items, $prtnum, Part()).descr))
+	return quote
+		if $prtnum == ""
+			col += 1
+		else
+			@write get(items, $prtnum, Part()).descr
+		end
+	end
 end
-
 
 function bakerFStatus(ws)
 	fLocs = allFLabels()
@@ -56,19 +63,18 @@ function bakerFStatus(ws)
 	for loc in sort(fLocs)
 		col = 0
 		@write loc
-		dep = loc in deployed ? "*" : "" # has this bin been deployed
-		@write dep
-		@write loc in used ? "*":""
+		@Star loc in deployed
+		@Star loc in used
 		item = get(inv_by_loc, loc, Stoloc()) # item stored this location
 		@nonE item.prtnum
 		@descr item.prtnum
-		@nonz item.qty
+		@nonZ item.qty
 		prtass = string(get(locskus, loc, "")) # prtnum assigned to this location
 		@write prtass
-		@Yes !(item.prtnum != "" && item.prtnum == prtass) # does this product need moving ?
+		@Yes item.prtnum != "" && item.prtnum != prtass # does this product need moving ?
 		@Yes item.prtnum != prtass # does this space need filling 
-		@Yes dep=="*" && prtass != "" # is the bin deployed and assigned
-		@Yes dep=="*" && item.prtnum=="" # can we replenish this bin i.e. deployed and empty
+		@Yes prtass != "" && loc in deployed  # is the bin deployed and assigned
+		@Yes item.prtnum == "" && loc in deployed  # can we replenish this bin i.e. deployed and empty
 		row += 1
 	end
 	
