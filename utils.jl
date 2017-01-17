@@ -179,11 +179,22 @@ macro dictCols(df, ks, vs) # create dictionary, one column as keys, one as value
 	end
 end
 
+macro cacheFun(fun, fn)
+	return quote 
+		if isfile($fn)
+			@deserialise($fn)
+		else
+			@serialise($fn, $fun())
+		end
+	end
+end
+
 macro serialise(fn, v)
 	return quote
 		fid = open($fn, "w+")
 		serialize(fid, $v)
 		close(fid)
+		$v
 	end
 end
 
