@@ -234,7 +234,7 @@ function prtnumOrderFreq()
 	return dct
 end
 
-typealias OrdLine Dict{AbstractString, Dict{Date, Int64}}
+typealias OrdLine Dict{AbstractString, Dict{Date, Int64}} # sku => Dict{date=>qty}
 
 function orderAmntByDay(yr)
 	df = qSQL("
