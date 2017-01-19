@@ -163,7 +163,7 @@ function newSessionID()
 	end
 end
 
-function qMoca(q::ASCIIString, fields=[])
+function qMoca(q::AbstractString, fields=[])
 	@moca fields begin
 		@var env "LOCALE_ID" "US_ENGLISH"
 		@var env "USR_ID" CREDENTIALS["un"]
@@ -173,7 +173,7 @@ function qMoca(q::ASCIIString, fields=[])
 	end
 end
 
-function qSQL(q::ASCIIString, fields=[])
+function qSQL(q::AbstractString, fields=[])
 	qMoca("[" * q * "]", fields)
 end
 
