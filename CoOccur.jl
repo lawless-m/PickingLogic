@@ -66,7 +66,7 @@ function kclusters(k)
 end
 
 function velocityDict()
-	# dictionary keys of partnumbers sorted by number of times picked
+	# dictionary keys of partnumbers sorted by number of times ordered
 	
 	#order = @vsort(ans)
 end

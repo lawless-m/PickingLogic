@@ -100,7 +100,7 @@ function fillRPSchema()
 	end
 end
 
-function fillPicks(yr)
+function fillOrders(yr)
 	@iif isfile("Picks_20$yr.xls")
 	xl = @sheet("Picks_20$yr.xls", "Picks_20$yr")
 	loc = SQLite.Stmt(DB, "INSERT OR IGNORE INTO Locations (label, rack, level, bin) VALUES(?, ?, ?, ?)")
@@ -194,15 +194,15 @@ function partnumsInLocationPerOrder(o)
 	i64("SELECT DISTINCT OrderLine.prtnum FROM OrderLine, SKUs WHERE OrderLine.ordnum=$o AND OrderLine.prtnum=SKUs.prtnum AND SKUs.location IS NOT NULL ORDER BY OrderLine.prtnum", :prtnum)
 end
 
-function pickCounts()
+function ordCounts()
 	@dictCols("SELECT prtnum, COUNT(prtnum) AS cnt FROM OrderLine GROUP BY prtnum", :prtnum, :cnt)
 end
 
-function pickCountsByMonth()
+function ordCountsByMonth()
 	SQLite.query(DB, "SELECT prtnum, day / 100 AS yrmnth, COUNT(prtnum) as cnt FROM OrderLine GROUP BY prtnum, yrmnth")
 end
 
-function pickCountsByQtr()
+function ordCountsByQtr()
 	SQLite.query(DB, "SELECT prtnum, day / 10000 as yr , (((day / 100) % 100) /4)+1 as qtr, COUNT(prtnum) as cnt FROM OrderLine GROUP BY prtnum, yr, qtr")
 end
 
@@ -223,7 +223,7 @@ function initialise()
 	fillInv()
 	for y in 16:-1:13
 		importOrders(y)
-		fillPicks(y)
+		fillOrders(y)
 	end
 	labelLocations()
 	distanceFill()

@@ -8,10 +8,14 @@ using DataFrames
 
 include("utils.jl")
 
-export FIFOSort, Stoloc, Part, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster, OrdLine, orderAmntByDay
+export FIFOSort, Stoloc, Part, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster, OrdLine, orderAmntByDay, Pick, picksForYear
 
 login("credentials.jls")
 setLog(true)
+
+macro DF(s, def)
+	:(haskey(df, $s) ? isna(df[$s][r]) ? $def : df[$s][r] : $def)
+end
 
 type Stoloc
 	prtnum::AbstractString
@@ -25,27 +29,7 @@ type Stoloc
 	# don't forget to change show if you change this
 	Stoloc() = new("", "", "", DateTime(), "", "", 0, "")
 	Stoloc(p, a, s, f, l, c, q, w) = new(p, a, s, f, l, c, q, w)
-	function Stoloc(df, r)
-		dns(x)=x
-		dns(x::DataArrays.NAtype)=""
-		
-		p = dns(haskey(df, :prtnum) ? df[:prtnum][r] : "")
-		a = dns(haskey(df, :area) ? df[:area][r] : "")
-		s = dns(haskey(df, :stoloc) ? df[:stoloc][r] : "")
-		f = haskey(df, :fifo) ? df[:fifo][r] : DateTime()
-		l = dns(haskey(df, :lodnum) ? df[:lodnum][r] : "")
-		c = dns(haskey(df, :case_id) ? df[:case_id][r] : "")
-		q = dns(haskey(df, :qty) ? df[:qty][r] : 0)
-		w = dns(haskey(df, :wh_entry_id) ? df[:wh_entry_id][r] : "")
-		
-		if haskey(df, :dsc)
-			@printf STDERR "dsc in query\n"
-		end
-		if haskey(df, :typcod)
-			@printf STDERR "typcod in query\n"
-		end
-		new(p, a, s, f, l, c, q, w)
-	end
+	Stoloc(df, r) = new(@DF(:prtnum, ""), @DF(:stoloc, ""), @DF(:fifo, DateTime()), @DF(:lodnum, ""), @DF(:case_id, ""), @DF(:qty, 0), @DF(:wh_entry_id, ""))
 end
 
 type Part
@@ -55,18 +39,21 @@ type Part
 	descr::AbstractString
 	Part() = new("", "", "", "")
 	Part(p, t, f, d) = new(p, t, f, d)
-	function Part(df, r)
-		dns(x)=x
-		dns(x::DataArrays.NAtype)=""
-		
-		p = dns(haskey(df, :prtnum) ? df[:prtnum][r] : "")
-		t = dns(haskey(df, :typcod) ? df[:typcod][r] : "")
-		f = dns(haskey(df, :prtfam) ? df[:prtfam][r] : "")
-		d = dns(haskey(df, :dsc) ? df[:dsc][r] : "")
-		
-		new(p, t, f, d)
+	Part(df, r) = new(@DF(:prtnum, ""), @DF(:typcode, ""), @DF(:prtfam, ""), @DF(:dsc, ""))
+end
+
+type Pick # SELECT prtnum, pckqty AS qty, datum FROM pckwrk GROUP BY prtnum, datum
+	prtnum::AbstractString
+	qty::Int64
+	date::Date
+	Pick() = new("", 0, Date())
+	Pick(p, q, d) = new(p, q, d)
+	function Pick(df, r)
+		p, q, d = @DF(:prtnum, ""), @DF(:pckqty, 0), @DF(:pckdte, "0000-01-01")
+		new(p, q, Date(d))
 	end
 end
+	
 
 function show(io::IO, s::Stoloc)
 	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S lodnum:%s case_id:%s qty:%d wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.lodnum s.case_id s.qty s.wh_entry_id
@@ -136,7 +123,6 @@ function typeCode(prtnum)
 	@printf STDERR "HIARP.typeCode used\n"
 	qSQL("SELECT typcod from prtmst WHERE prtnum=@prtnum AND prt_client_id ='HUS' AND wh_id_tmpl='----'", [("prtnum", prtnum)])[:typcod][1]
 end
-
 
 function prtNames()
 	qSQL("SELECT DISTINCT colval, lngdsc FROM prtdsc WHERE colval LIKE '%|HUS|----'")
@@ -277,6 +263,30 @@ function orderFreqByQtr()
 		SELECT prtnum, COUNT(*) AS cnt, qtr FROM ords GROUP BY prtnum, qtr")
 end
 
+function picksForYear(yr)
+	picks = Dict{AbstractString, Vector{Vector{Pick}}}()
+	dates = ["01/01/$yr" "02/01/$yr" "03/01/$yr" "04/01/$yr" "05/01/$yr" "06/01/$yr" "07/01/$yr" "08/01/$yr" "09/01/$yr" "10/01/$yr" "11/01/$yr" "12/01/$yr" "01/01/$(yr+1)"]
+	for m = 1:12
+		df = qSQL("
+			WITH ords(ordnum) AS (SELECT ordnum FROM ord WHERE client_id='HUS' AND wh_id='MFTZ')
+			SELECT ords.ordnum, convert(date, pckwrk.pckdte) AS pckdte, pckwrk.prtnum, pckwrk.pckqty 
+			FROM ords INNER JOIN pckwrk ON pckwrk.ordnum=ords.ordnum
+			WHERE pckwrk.pckdte >= '$(dates[m])' AND pckwrk.pckdte < '$(dates[m+1])'
+		")
+		for r in 1:size(df)[1]
+			p = Pick(df, r)
+			if !haskey(picks, p.prtnum)
+				picks[p.prtnum] = Vector{Vector{Pick}}(12)
+			end
+			if isdefined(picks[p.prtnum], m)
+				push!(picks[p.prtnum][m], p)
+			else
+				picks[p.prtnum][m] = [p]
+			end
+		end
+	end
+	picks
+end
 
 function currentStolocsDF()
 	qSQL("SELECT distinct arecod as area, prtnum as prtnum, stoloc as stoloc, untqty as qty, inv_attr_str5 as wh_entry_id 

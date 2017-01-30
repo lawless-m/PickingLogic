@@ -33,16 +33,16 @@ currLabels = collect(keys(currStolocs))
 
 const skus = itemMaster()
 const Prtnums = collect(keys(skus))
-const PickCountsByQtr = DictVec(Velq, :prtnum, HIARP.orderFreqByQtr()) # prtnum => Vector{.qtr .count}
-const PickCounts = HIARP.orderFreq() # prtnum => pickCount
+const OrdCountsByQtr = DictVec(Velq, :prtnum, HIARP.orderFreqByQtr()) # prtnum => Vector{.qtr .count}
+const OrdCounts = HIARP.orderFreq() # prtnum => ordCount
 
-pickCount(k) = haskey(PickCounts, k) ? PickCounts[k] : 0
+ordCount(k) = haskey(OrdCounts, k) ? OrdCounts[k] : 0
 
 
 const Ranks = begin
 		ranks = Dict{AbstractString, Int64}() # prtnum => rank
 		rank=0
-		for vrank in sortperm(Prtnums, lt=(a, b)->pickCount(a)<pickCount(b), rev=true)
+		for vrank in sortperm(Prtnums, lt=(a, b)->ordCount(a)<ordCount(b), rev=true)
 			rank += 1
 			ranks[Prtnums[vrank]] = rank
 		end
@@ -63,12 +63,12 @@ const LocRank =  Dict{AbstractString, Int64}([loc => haskey(locskus, loc) ? Rank
 
 function printQtrs()
 	#=
-		print parts with most picked first, include each picks per quarter also
+		print parts with most ordered first, include each ords per quarter also
 	=#
 	@fid("g:/Heinemann/abc.txt", 
 		for vrank in 1:size(Prtnums)[1]
-			@printf fid "P%d\tPicks:%d\t%s\n" Ranks[Prtnums[vrank]] PickCounts[Prtnums[vrank]] skus[Prtnums[vrank]]
-			for v in PickCountsByQtr[Prtnums[vrank]]
+			@printf fid "P%d\tOrders:%d\t%s\n" Ranks[Prtnums[vrank]] OrdCounts[Prtnums[vrank]] skus[Prtnums[vrank]]
+			for v in OrdCountsByQtr[Prtnums[vrank]]
 				@printf fid "\t%s\t%d\n" v.qtr v.count
 			end
 		end
@@ -81,27 +81,27 @@ function printRankLocs(fid)
 	=#
 	for loc in sort(Racks)
 		if LocRank[loc] > 0
-			@printf fid "%s - Visits:%#2d - %s (%#2.2f)\n" loc pickCount(locskus[loc]) @class(LocRank[loc]) 100LocRank[loc]/size(Prtnums)[1]
+			@printf fid "%s - Visits:%#2d - %s (%#2.2f)\n" loc ordCount(locskus[loc]) @class(LocRank[loc]) 100LocRank[loc]/size(Prtnums)[1]
 		else
 			@printf fid "%s - noSKU\n" loc
 		end
 	end
 end
 
-function pickCountFreqs()
-	maxCnt = max(collect(values(PickCounts))...)
-	pickFreqs = zeros(Int64, maxCnt+1) # [freq+1]=count
+function ordCountFreqs()
+	maxCnt = max(collect(values(OrdCounts))...)
+	ordFreqs = zeros(Int64, maxCnt+1) # [freq+1]=count
 	for prtnum in collect(keys(skus))
-		pickFreqs[pickCount(prtnum)+1] += 1
+		ordFreqs[ordCount(prtnum)+1] += 1
 	end
-	pickFreqs
+	ordFreqs
 end
 
-function printPickCountFreqs(fid, pickFreqs) # for barchart
+function printOrdCountFreqs(fid, ordFreqs) # for barchart
 	begin
 		@printf fid "Freq\tCount\n"
-		for cnt in 1:size(pickFreqs)[1]
-			@printf fid "%d\t%d\n" cnt-1 pickFreqs[cnt]
+		for cnt in 1:size(ordFreqs)[1]
+			@printf fid "%d\t%d\n" cnt-1 ordFreqs[cnt]
 		end
 	end
 end
@@ -119,7 +119,7 @@ end
 
 
 
-#@fid "g:/Heinemann/pickCountFreqs.txt" printPickCountFreqs(fid, pickCountFreqs())
+#@fid "g:/Heinemann/ordCountFreqs.txt" printOrdCountFreqs(fid, ordCountFreqs())
 @fid "stoloc_visits.txt" printRankLocs(fid)
 #@fid "g:/Heinemann/shelfRanks.txt" rankRacks(fid)
 

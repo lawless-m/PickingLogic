@@ -40,5 +40,6 @@ function findLikeT(t)
 	end
 end
 
-findLikeT("ATU")
+#findLikeT("ATU")
+findT("LST000000005BBW")
 

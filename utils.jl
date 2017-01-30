@@ -1,4 +1,14 @@
 
+
+
+const Years = 2013:2017
+const MaxDays = Dict{Int64, Int64}()
+for yr in Years
+	MaxDays[yr] = yr == 2016 ? 366:365
+end
+
+
+
 macro push!(d, k, v)
 	return quote
 		if !haskey($d, $k)
@@ -181,7 +191,7 @@ end
 
 macro cacheFun(fun, fn)
 	return quote 
-		if isfile($fn)
+		if stat($fn).size > 0
 			@deserialise($fn)
 		else
 			@serialise($fn, $fun())
@@ -501,5 +511,20 @@ end
 	
 			
 
+function cacheOrders()
+	ords = Dict{Int64, OrdLine}() # year => {sku => Dict{date=>qty}}
+	for yr in Years
+		ords[yr] = orderAmntByDay(yr)		
+	end
+	ords
+end
+
+function cachePicks()
+	picks = Dict{Int64, Dict{AbstractString, Vector{Vector{Pick}}}}()
+	for yr in Years
+		picks[yr] = picksForYear(yr)
+	end
+	picks
+end
 	
 	

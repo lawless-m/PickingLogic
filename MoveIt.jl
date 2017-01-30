@@ -6,14 +6,14 @@ include("utils.jl")
 
 const SKUs = HIADB.SKUs()
 const Prtnums = collect(keys(SKUs))
-const PickCounts = HIADB.pickCounts() # prtnum => pickCount
+const OrdCounts = HIADB.ordCounts() # prtnum => ordCount
 
-pickCount(k) = haskey(PickCounts, k) ? PickCounts[k] : 0
+ordCount(k) = haskey(OrdCounts, k) ? OrdCounts[k] : 0
 
 const Ranks = begin
 		ranks = Dict{Int64, Int64}() # prtnum => rank
 		rank=0
-		for vrank in sortperm(Prtnums, lt=(a, b)->pickCount(a)<pickCount(b), rev=true)
+		for vrank in sortperm(Prtnums, lt=(a, b)->ordCount(a)<ordCount(b), rev=true)
 			rank += 1
 			ranks[Prtnums[vrank]] = rank
 		end
