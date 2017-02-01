@@ -37,23 +37,45 @@ function prtmonths()
 	end
 end
 
-function parseReport(repFn)
-	xl = @sheet repFn 1
-	@Xls replace(repFn, ".xlsx", "_PutAways") begin
-		prtnums = unique(xl[2:end,3])
-		ws = add_worksheet!(xls, "Articles")
-		write_row!(ws, 0, 0, ["Article" "Descr" "Typcod" "Typ" "Put aways"])
-		puts = wherePuts(prtnums, unique(xl[2:end,8])) # prtnums, wh_entry_ids
-		for sku in prtnums
-			c = write_row!(ws, xr, 0, [prtnum items[sku].descr items[sku].typcod Merch_cat[items[sku].typcod])
-			if haskey(puts, sku)
-				c += write_row!(ws, xr, c, [s.stoloc for s in puts[sku]])	
-			end
+function parsewhIDs(ws, skus, whids)
+	write_row!(ws, 0, 0, ["Article" "Descr" "Typcod" "Typ" "Put aways"])
+	puts = wherePuts(skus, whids)
+	row = 1
+	for sku in skus
+		item = items[sku]
+		c = write_row!(ws, row, 0, [sku item.descr item.typcod Merch_cat[item.typcod]])
+		if haskey(puts, sku)
+			c += write_row!(ws, row, c, [s.stoloc for s in puts[sku]])	
 		end
+		row += 1
 	end
 end
 
-parseReport("Billing/December_processed.xlsx")
+
+function getRecd(year, month)
+	recd = HIARP.getRecd(year, month)
+	skus = Set()
+	whids = Set()
+	@Xls "Billing/recd_$(year)_$(month)" begin
+		dte = add_format!(xls, Dict("num_format"=>"d mmm yyyy"))
+		ws = add_worksheet!(xls, "Data")
+		write_row!(ws, 0, 0, ["Date" "Activity"	"Article" "Status" "rcvqty"	"units per Case"	"# cases"	"Entry ID"	"Invoice"	"Received by"	"Typcod"	"Type"	"Cases"	"Eaches"	"Pallets"])
+		for row in 1:length(recd)
+			r = recd[row]
+			item = get(items, r.prtnum, "")
+			typ = item == "" ? "XX" : item.typcod				
+			cat = get(Merch_cat, typ, "XX")
+			write!(ws, row, 0, r.date, dte)
+			write_row!(ws, row, 1, [r.activity r.prtnum r.status r.rcvqty r.untcas 0 r.entry_id r.invnum r.recd_by typ cat 0 0 0])
+			push!(skus, r.prtnum)
+			push!(whids, r.entry_id)
+		end	
+		parsewhIDs(add_worksheet!(xls, "Articles"), skus, whids)
+	end
+end
+
+getRecd(2017, 1)
+#parseReport("Billing/December_processed.xlsx")
 
 
 
