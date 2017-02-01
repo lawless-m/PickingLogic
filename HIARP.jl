@@ -29,7 +29,9 @@ type Stoloc
 	# don't forget to change show if you change this
 	Stoloc() = new("", "", "", DateTime(), "", "", 0, "")
 	Stoloc(p, a, s, f, l, c, q, w) = new(p, a, s, f, l, c, q, w)
-	Stoloc(df, r) = new(@DF(:prtnum, ""), @DF(:stoloc, ""), @DF(:fifo, DateTime()), @DF(:lodnum, ""), @DF(:case_id, ""), @DF(:qty, 0), @DF(:wh_entry_id, ""))
+	function Stoloc(df, r) 
+		new(@DF(:prtnum, ""), @DF(:lastareacod, ""), @DF(:stoloc, ""), @DF(:fifo, DateTime()), @DF(:lodnum, ""), @DF(:case_id, ""), @DF(:qty, 0), @DF(:wh_entry_id, ""))
+	end
 end
 
 type Part
@@ -39,7 +41,7 @@ type Part
 	descr::AbstractString
 	Part() = new("", "", "", "")
 	Part(p, t, f, d) = new(p, t, f, d)
-	Part(df, r) = new(@DF(:prtnum, ""), @DF(:typcode, ""), @DF(:prtfam, ""), @DF(:dsc, ""))
+	Part(df, r) = new(@DF(:prtnum, ""), @DF(:typcod, ""), @DF(:prtfam, ""), @DF(:dsc, ""))
 end
 
 type Pick # SELECT prtnum, pckqty AS qty, datum FROM pckwrk GROUP BY prtnum, datum
@@ -53,7 +55,24 @@ type Pick # SELECT prtnum, pckqty AS qty, datum FROM pckwrk GROUP BY prtnum, dat
 		new(p, q, Date(d))
 	end
 end
-	
+
+type InvAct
+	date::DateTime
+	activity::AbstractString
+	prtnum::AbstractString
+	status::AbstractString
+	rcvqty::Int64
+	untcas::Int64
+	entry_id::AbstractString
+	invnum::AbstractString
+	recd_by::AbstractString
+	InvAct() = new(DateTime(), "", "", "", 0, 0, "", "", "")
+	InvAct(d, a, p, s, r, u, e, i, b) = new(d, a, p, s, r, u, e, i, b)
+	function InvAct(df, r)
+		d = @DF(:trndte, "0000-01-01 00:00:00")
+		new(d, @DF(:actcod, ""), @DF(:prtnum, ""), @DF(:invsts, ""), @DF(:rcvqty, 0), 0, @DF(:inv_attr_str5, ""), @DF(:invnum, ""), @DF(:mod_usr_id, ""))
+	end
+end
 
 function show(io::IO, s::Stoloc)
 	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S lodnum:%s case_id:%s qty:%d wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.lodnum s.case_id s.qty s.wh_entry_id
@@ -346,6 +365,40 @@ end
 function wherePuts(prtnums, wh_entry_ids)
 	df = qSQL("SELECT DISTINCT prtnum, stoloc FROM inventory_view WHERE prtnum " * @IN(prtnums) * " AND inv_attr_str5 " * @IN(wh_entry_ids) * " AND lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-9]%' or stoloc like 'F-%')")
 	DictVec(Stoloc, :prtnum, df)
+end
+
+function unitCases(dte, prtnums)
+	df = qSQL("SELECT distinct prtnum, untcas FROM invdtl WHERE prtnum " * @IN(prtnums) * " AND $dte")
+	unts = Dict{AbstractString, Int64}()
+	for r in 1:size(df, 1)
+		unts[df[:prtnum][r]] = df[:untcas][r]
+	end
+	unts
+end
+
+function getRecd(year, month)
+	y_m = @sprintf "%04d-%02d" year month
+	d_end = @sprintf "%02d" Dates.day(Dates.lastdayofmonth(Date(year,month,1)))
+	dte = "trndte>='$(y_m)-01 00:00:00' and trndte <='$(y_m)-$(d_end) 23:59:59'"
+	#df = qMoca("list inventory activity WHERE actcod =  'INVRCV' AND wh_id =  'MFTZ' AND trndte[between to_date('$(y_m)01000000') and to_date('$(y_m)$(d_end)235959')]")
+	df = qSQL("
+	SELECT rcvqty, trndte, actcod, prtnum, invsts,  inv_attr_str5 , invnum, mod_usr_id 
+	FROM invact 
+	WHERE  actcod='INVRCV'
+	AND wh_id='MFTZ'
+	AND $dte
+")
+	recs = InvAct[]
+	parts = Set()
+	for r in 1:size(df, 1)
+		push!(parts, df[:prtnum][r])
+		push!(recs, InvAct(df, r))
+	end
+	unts = unitCases(replace(dte, "trndte", "rcvdte"), parts)
+	for i in 1:size(recs,1)
+		recs[i].untcas = get(unts, recs[i].prtnum, 0)
+	end
+	recs
 end
 
 
