@@ -64,8 +64,7 @@ function findwithCandPrtnum(c, prtnum, scheme)
 	end
 end
 
-
-function findT(t, scheme)
+function findT(t, scheme) # if T is textxt, it needs quoting with '
 	@fid "$t.txt" for table in keys(scheme)
 		df = HIARP.RPClient.qSQL("SELECT * FROM $table WHERE (" * join(scheme[table], "=$t OR ") * "=$t) AND rownum=1")
 		if size(df,1) > 0
@@ -74,6 +73,7 @@ function findT(t, scheme)
 		end
 	end
 end
+
 function findLikeT(t, scheme)
 	@fid "$t%.txt" for table in keys(scheme)
 		df = HIARP.RPClient.qSQL("SELECT * FROM $table WHERE (" * join(scheme[table], " like '$t%' OR ") * " like '$t%') AND rownum=1")
@@ -86,8 +86,8 @@ end
 
 
 #findLikeT("'ATU'", tColumns(["nvarchar" "varchar" "char"]))
-#find("LST000000005BBW", tColumns(["nvarchar" "varchar" "char"]))
+findT("'MWHEATH'", tColumns(["nvarchar" "varchar" "char"]))
 
 # findPrtnum(15, "'816520'", tColumns(["int"]))
 
-findwithCandPrtnum("untcas", "'816520'", tColumns(["int"]))
+#findwithCandPrtnum("untcas", "'816520'", tColumns(["int"]))

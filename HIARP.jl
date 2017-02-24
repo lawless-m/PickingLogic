@@ -17,6 +17,8 @@ macro DF(s, def)
 	:(haskey(df, $s) ? isna(df[$s][r]) ? $def : df[$s][r] : $def)
 end
 
+const AREAS = ["HWLFTZRH" "HWLFTZRL" "PALR01" "CLDRMST" "BBINA01" "BIN01"]
+
 type Stoloc
 	prtnum::AbstractString
 	area::AbstractString
@@ -30,7 +32,7 @@ type Stoloc
 	Stoloc() = new("", "", "", DateTime(), "", "", 0, "")
 	Stoloc(p, a, s, f, l, c, q, w) = new(p, a, s, f, l, c, q, w)
 	function Stoloc(df, r) 
-		new(@DF(:prtnum, ""), @DF(:lastareacod, ""), @DF(:stoloc, ""), @DF(:fifo, DateTime()), @DF(:lodnum, ""), @DF(:case_id, ""), @DF(:qty, 0), @DF(:wh_entry_id, ""))
+		new(@DF(:prtnum, ""), @DF(:area, ""), @DF(:stoloc, ""), @DF(:fifo, DateTime()), @DF(:lodnum, ""), @DF(:case_id, ""), @DF(:qty, 0), @DF(:wh_entry_id, ""))
 	end
 end
 
@@ -63,16 +65,35 @@ type InvAct
 	status::AbstractString
 	rcvqty::Int64
 	untcas::Int64
-	entry_id::AbstractString
+	wh_entry_id::AbstractString
 	invnum::AbstractString
 	recd_by::AbstractString
 	InvAct() = new(DateTime(), "", "", "", 0, 0, "", "", "")
 	InvAct(d, a, p, s, r, u, e, i, b) = new(d, a, p, s, r, u, e, i, b)
 	function InvAct(df, r)
 		d = @DF(:trndte, "0000-01-01 00:00:00")
-		new(d, @DF(:actcod, ""), @DF(:prtnum, ""), @DF(:invsts, ""), @DF(:rcvqty, 0), 0, @DF(:inv_attr_str5, ""), @DF(:invnum, ""), @DF(:mod_usr_id, ""))
+		new(d, @DF(:actcod, ""), @DF(:prtnum, ""), @DF(:invsts, ""), @DF(:rcvqty, 0), 0, @DF(:wh_entry_id, ""), @DF(:invnum, ""), @DF(:mod_usr_id, ""))
 	end
 end
+
+type Away
+	date::DateTime
+	lodnum::AbstractString
+	prtnum::AbstractString
+	wh_entry_id::AbstractString
+	qty::Int64
+	frstoloc::AbstractString
+	tostoloc::AbstractString
+	area::AbstractString
+	Away() = new(DateTime(), "", "", "", 0, "", "", "")
+	Away(d, l, p, w, q, fs, ts, a) = new(d, l, p, w, q, fs, ts, a)
+	function Away(df, r)
+		d = @DF(:trndte, "0000-01-01 00:00:00")
+		new(d, @DF(:lodnum, ""), @DF(:prtnum, ""), @DF(:inv_attr_str5, ""), @DF(:trnqty, 0), @DF(:frstol, ""), @DF(:tostol, ""), @DF(:to_arecod, ""))
+	end
+end
+
+#  tostol, , ordnum, rowid
 
 function show(io::IO, s::Stoloc)
 	@printf io "Stoloc prtnum:%s area:%s stoloc:%s fifo:%S lodnum:%s case_id:%s qty:%d wh_entry_id:%s\n" s.prtnum s.area s.stoloc s.fifo s.lodnum s.case_id s.qty s.wh_entry_id
@@ -111,7 +132,7 @@ end
 
 function inventory()
 	inv = Dict{AbstractString, DataFrame}()
-	for area in ["HWLFTZRH", "HWLFTZRL", "PALR01", "CLDRMST", "BBINA01", "BIN01"]
+	for area in AREAS
 		inv[area] = qMoca("list inventory for display  WHERE wh_id = 'MFTZ' and  bldg_id='B1' and  prt_client_id='HUS' and arecod ='$area'")
 		
 		for i in [1 2 3 4 6 7 8 9 10]
@@ -167,7 +188,7 @@ function itemMaster(prtnums)
 end
 
 function prtnum_stoloc_wh_entry_id()
-	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE prt_client_id ='HUS' AND wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod in ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')")
+	qSQL("SELECT prtnum, stoloc, inv_attr_str5 from client_blng_inv WHERE prt_client_id ='HUS' AND wh_id='MFTZ' AND bldg_id='B1' AND fwiflg=1 and shpflg=0 and stgflg=0 and stoloc not like 'OST%' and stoloc not like 'QUA%' and stoloc not like 'R%' and arecod " * @IN(AREAS))
 end
 
 function columns(tbl)
@@ -194,7 +215,7 @@ function FIFOStolocsDF(prtnums)
 	qSQL("
 	SELECT distinct stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id 
 	FROM inventory_view
-	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')	
+	WHERE lst_arecod " * @IN(AREAS) * "
 	AND prtnum " * @IN(prtnums))
 end
 
@@ -209,13 +230,13 @@ end
 function BRItems()
 	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id 
 	FROM inventory_view
-	WHERE lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')"))
+	WHERE lst_arecod " * @IN(AREAS) * " and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')"))
 end
 
 function HUSInventory()
 	DictVec(Stoloc, :stoloc, qSQL("SELECT DISTINCT stoloc, lodnum AS load_id, subnum AS case_id, prtnum, fifdte AS fifo, lst_arecod AS area, untqty AS qty, inv_attr_str5 AS wh_entry_id
 	FROM inventory_view
-	WHERE prt_client_id='HUS' AND lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01')"))
+	WHERE prt_client_id='HUS' AND lst_arecod " * @IN(AREAS)))
 end
 
 function SKUs()
@@ -359,11 +380,11 @@ function stolocsHUS()
 end
 
 function wherePut(prtnum, wh_entry_id)
-	qSQL("SELECT distinct stoloc from inventory_view where prtnum=@prtnum and inv_attr_str5=@whid and lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')", [("prtnum", prtnum), ("whid", wh_entry_id)])
+	qSQL("SELECT distinct stoloc from inventory_view where prtnum=@prtnum and inv_attr_str5=@whid and lst_arecod " * @IN(AREAS)* " and (stoloc like '[0-1][0-9]-%' or stoloc like 'F-%')", [("prtnum", prtnum), ("whid", wh_entry_id)])
 end
 
 function wherePuts(prtnums, wh_entry_ids)
-	df = qSQL("SELECT DISTINCT prtnum, stoloc FROM inventory_view WHERE prtnum " * @IN(prtnums) * " AND inv_attr_str5 " * @IN(wh_entry_ids) * " AND lst_arecod IN ('BIN01', 'HWLFTZRH', 'HWLFTZRL', 'PALR01', 'CLDRMST', 'BBINA01') and (stoloc like '[0-9]%' or stoloc like 'F-%')")
+	df = qSQL("SELECT DISTINCT prtnum, stoloc FROM inventory_view WHERE prtnum " * @IN(prtnums) * " AND inv_attr_str5 " * @IN(wh_entry_ids) * " AND lst_arecod " * @IN(AREAS) * " and (stoloc like '[0-9]%' or stoloc like 'F-%')")
 	DictVec(Stoloc, :prtnum, df)
 end
 
@@ -376,25 +397,83 @@ function unitCases(dte, prtnums)
 	unts
 end
 
-function getRecd(year, month)
+function getRecdByWH(year, month)
+	df = getRecdDF(year, month)
+	DictVec(InvAct, :wh_entry_id, df)
+end
+
+function idntfyLods(wh_entry_ids)
+	df = qSQL(
+	"select lodnum, inv_attr_str5
+	from dlytrn
+	where inv_attr_str5 " * @IN(wh_entry_ids) * "
+	AND actcod='IDNTFY'
+	AND movref='INTERNAL'
+	"
+	)
+	whlods = Dict{AbstractString, Vector{AbstractString}}()
+	lods = AbstractString[]
+	for r in 1:size(df,1)
+		if haskey(whlods, df[:inv_attr_str5][r])
+			push!(whlods[df[:inv_attr_str5][r]], df[:lodnum][r])
+		else
+			whlods[df[:inv_attr_str5][r]] = AbstractString[df[:lodnum][r]]
+		end
+		push!(lods, df[:lodnum][r])
+	end
+	whlods, lods
+end
+
+function putAways(lodnums)
+	df = qSQL("
+	select trndte, lodnum, prtnum, inv_attr_str5, trnqty, frstol, tostol, to_arecod, ordnum
+	from dlytrn
+	where lodnum " * @IN(lodnums) * "
+	order by trndte
+	")
+	DictVec(Away, :inv_attr_str5, df)
+end
+
+function ym2range(year, month, field)
 	y_m = @sprintf "%04d-%02d" year month
 	d_end = @sprintf "%02d" Dates.day(Dates.lastdayofmonth(Date(year,month,1)))
-	dte = "trndte>='$(y_m)-01 00:00:00' and trndte <='$(y_m)-$(d_end) 23:59:59'"
-	#df = qMoca("list inventory activity WHERE actcod =  'INVRCV' AND wh_id =  'MFTZ' AND trndte[between to_date('$(y_m)01000000') and to_date('$(y_m)$(d_end)235959')]")
+	"($field >= '$(y_m)-01 00:00:00' and $field <= '$(y_m)-$(d_end) 23:59:59')"
+end
+
+function putAwaysInOne(year, month)
+	dte = ym2range(year, month, "trndte")
 	df = qSQL("
-	SELECT rcvqty, trndte, actcod, prtnum, invsts,  inv_attr_str5 , invnum, mod_usr_id 
+with 
+wh_ids as (SELECT inv_attr_str5 FROM invact WHERE  actcod='INVRCV' AND wh_id='MFTZ')
+, lods(lodnum, prtnum) as (select lodnum from dlytrn where inv_attr_str5 IN (select * from wh_ids) AND actcod='IDNTFY' AND movref='INTERNAL' and $dte)
+select trndte, lodnum, prtnum, inv_attr_str5, trnqty, tostol, to_arecod, ordnum, rowid
+from dlytrn 
+where $dte
+AND lodnum IN (select lodnum from lods) AND to_arecod " * @IN(AREAS))
+	DictMap(Away, :rowid, df)
+end
+
+function getRecdDF(year, month)
+	dte = ym2range(year, month, "trndte")
+	df = qSQL("
+	SELECT rcvqty, trndte, actcod,  inv_attr_str5 as wh_entry_id, prtnum, invsts, invnum, mod_usr_id 
 	FROM invact 
 	WHERE  actcod='INVRCV'
 	AND wh_id='MFTZ'
 	AND $dte
 ")
+	return df
+end
+	
+function getRecd(year, month)
+	df = getRecdDF(year, month)	
 	recs = InvAct[]
 	parts = Set()
 	for r in 1:size(df, 1)
 		push!(parts, df[:prtnum][r])
 		push!(recs, InvAct(df, r))
 	end
-	unts = unitCases(replace(dte, "trndte", "rcvdte"), parts)
+	unts = unitCases(ym2range(year, month, "rcvdte"), parts)
 	for i in 1:size(recs,1)
 		recs[i].untcas = get(unts, recs[i].prtnum, 0)
 	end

@@ -66,9 +66,9 @@ function getRecd(year, month)
 			typ = item == "" ? "XX" : item.typcod				
 			cat = get(Merch_cat, typ, "XX")
 			write!(ws, row, 0, r.date, dte)
-			write_row!(ws, row, 1, [r.activity r.prtnum r.status r.rcvqty r.untcas 0 r.entry_id r.invnum r.recd_by typ cat 0 0 0])
+			write_row!(ws, row, 1, [r.activity r.prtnum r.status r.rcvqty r.untcas 0 r.wh_entry_id r.invnum r.recd_by typ cat 0 0 0])
 			push!(skus, r.prtnum)
-			push!(whids, r.entry_id)
+			push!(whids, r.wh_entry_id)
 		end	
 		parsewhIDs(add_worksheet!(xls, "Articles"), skus, whids)
 	end
@@ -76,6 +76,24 @@ end
 
 getRecd(2017, 1)
 #parseReport("Billing/December_processed.xlsx")
+
+function inv()
+	df = HIARP.qSQL("select dtlnum, subnum, fifdte, expire_dte  ,untqty,rcvkey  ,ship_line_id  ,wrkref   ,adddte  ,rcvdte ,lstmov     ,lstdte     ,lstcod    ,lst_usr_id ,inv_attr_str5 from invdtl where rcvkey='161100000928754'")
+	println(df)
+	
+	df = HIARP.qSQL("select invact_id   ,trndte       ,actcod  ,inv_attr_str5 ,rcvqty ,shpqty ,ship_id   ,ship_line_id ,ordnum     ,ordlin  ,ordsln  ,ordtyp  ,trknum    ,invnum      ,supnum  ,invlin ,invsln  ,invtyp,moddte        ,mod_usr_id   
+
+  FROM invact                                                                             
+        WHERE  actcod='INVRCV'                                                                  
+        AND wh_id='MFTZ'               
+and prtnum='66400'                                                         
+        AND trndte >='2017-01-01 00:00:00' and trndte <='2017-01-31 23:59:59'      
+") 
+
+	println(df)
+end
+
+#inv()
 
 
 

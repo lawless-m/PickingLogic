@@ -72,9 +72,9 @@ function fillDF(res)
 end
 
 function postMOCA(xml)
-	if logMoca == true
-		@printf STDERR "%s\n" xml
-	end
+#	if logMoca == true
+		@printf STDOUT "SENDING: %s\n\n" xml
+#	end
 	r = Requests.post(CREDENTIALS["host"]*(CREDENTIALS["id"] == "" ? "service" : "service?msession=" * CREDENTIALS["id"]); headers = Dict("Content-Type" => "application/moca-xml", "Response-Encoder" => "xml"), data=xml)
 	xml = parse_string(readall(r))
 	els = get_elements_by_tagname(root(xml), "session-id")

@@ -94,10 +94,15 @@ macro denull(T, data, col)
 	:($T[Base.get(x) for x in $data[$col]])
 end
 
+macro DF(s, def)
+	:(haskey(df, $s) ? isna(df[$s][r]) ? $def : df[$s][r] : $def)
+end
+
 function DictVec(T, k, df)
 	dd = Dict{AbstractString, Vector{T}}() # AbstractString => Vector{T}
 	for r in 1:size(df[1], 1)
-		@push!(dd, df[k][r], T(df, r))
+		key = @DF(k, "NA!")
+		@push!(dd, key, T(df, r))
 	end	
 	dd
 end
@@ -378,7 +383,7 @@ end
 
 
 
-function physicalHUS()
+function physicalHUSLocations() 
 	locs = BLabels()
 	locs = vcat(locs, allFLabels())
 	
@@ -525,6 +530,24 @@ function cachePicks()
 		picks[yr] = picksForYear(yr)
 	end
 	picks
+end
+
+function merch(prtnum)
+	prt = get(items, prtnum, HIARP.Part())
+	if prt.prtnum == prtnum
+		prt.typcod, get(Merch_cat, prt.typcod, "")
+	else
+		"", ""
+	end
+end
+
+function family(prtnum)
+	prt = get(items, prtnum, HIARP.Part())
+	if prt.prtnum == prtnum
+		prt.family, get(Familes, prt.family, "")
+	else
+		"", ""
+	end
 end
 	
 	

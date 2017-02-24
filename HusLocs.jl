@@ -22,30 +22,11 @@ function newSheet(wb, rack, Cols, fmt)
 end
 
 skulocs, locskus, rackskus = skuLocations()
-
-phys = physicalHUS()
-
+physLocs = physicalHUSLocations()
 curr = currentStolocs()
 items = itemMaster()
 
 
-function merch(prtnum)
-	prt = get(items, prtnum, HIARP.Part())
-	if prt.prtnum == prtnum
-		prt.typcod, get(Merch_cat, prt.typcod, "")
-	else
-		"", ""
-	end
-end
-
-function family(prtnum)
-	prt = get(items, prtnum, HIARP.Part())
-	if prt.prtnum == prtnum
-		prt.family, get(Familes, prt.family, "")
-	else
-		"", ""
-	end
-end
 
 
 function rackName(stoloc)
@@ -89,27 +70,47 @@ function racklist(stolocs)
 end
 
 macro INphys(x)
-	:(uppercase($x) in phys ? "*" : "")
+	:(uppercase($x) in physLocs ? "*" : "")
 end
 
 macro descr(prtnum)
 	:(get(items, $prtnum, Part()).descr)
 end
 
-function writeLoc(curr, sheets, rack, loc, area)
-	if haskey(curr, loc)
-		sto = curr[loc][1]
-		
-		data = [area loc @INphys(loc) sto.prtnum @descr(sto.prtnum) sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...]
-	else
-		data = [area loc @INphys(loc)]					
-	end
+function writeLocData(sheets, rack, area, data)
+
 	write_row!(sheets[area][1], sheets[area][2], 0, data[2:end])
 	write_row!(sheets[rack][1], sheets[rack][2], 0, data)
 	write_row!(sheets["All"][1], sheets["All"][2], 0, data)	
 		
 	for s in (area, rack, "All")
 		sheets[s] = (sheets[s][1], sheets[s][2] + 1)
+	end
+end
+
+function writeLoc(curr, sheets, rack, loc, area)
+	if haskey(curr, loc)
+		prts = Dict{AbstractString, Stoloc}()
+		for sto in curr[loc]
+			if haskey(prts, sto.prtnum)
+				prts[sto.prtnum].qty += sto.qty
+			else
+				prts[sto.prtnum] = sto
+			end
+		end
+		dups = size(collect(keys(prts)), 1) > 1
+		
+		for (prt,sto) in prts
+			writeLocData(sheets, rack, area, [area loc @INphys(loc) sto.prtnum @descr(sto.prtnum) sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...])
+			if dups
+				write_row!(sheets["All"][1], sheets["All"][2], 0, [area loc @INphys(loc) sto.prtnum @descr(sto.prtnum) sto.qty haskey(skulocs, i64(sto.prtnum)) ? skulocs[i64(sto.prtnum)][1] : "" merch(sto.prtnum)... family(sto.prtnum)...])	
+			end
+		end
+		if dups
+			sheets["DUPS"] = (sheets["DUPS"][1], sheets["DUPS"][2] + 1)
+		end
+	else
+		writeLocData(sheets, rack, area, [area loc @INphys(loc)])
 	end
 
 end
@@ -134,6 +135,7 @@ function allstolocs()
 		date_format = add_format!(xls, Dict("num_format"=>"d mmmm yyyy"))
 		sheets = Dict{AbstractString, Tuple{Worksheet, Int64}}() # name => (ws, rownum)
 		sheets["All"] = (newSheet(xls, "ALL", Cols, bold), 1)
+		sheets["DUPS"] = (newSheet(xls, "DUPS", Cols, bold), 1)
 		tick = 0
 		for rack in sort(collect(keys(racks)))
 			println(rack)
