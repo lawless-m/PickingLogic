@@ -9,6 +9,7 @@ using DataFrames
 include("utils.jl")
 
 export FIFOSort, Stoloc, Part, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster, OrdLine, orderAmntByDay, Pick, picksForYear
+export AREAS, BINS, CARTONS
 
 login("credentials.jls")
 setLog(true)
@@ -18,6 +19,8 @@ macro DF(s, def)
 end
 
 const AREAS = ["HWLFTZRH" "HWLFTZRL" "PALR01" "CLDRMST" "BBINA01" "BIN01"]
+const BINS = ["BBINA01" "BIN01"]
+const CARTONS = ["HWLFTZRH" "HWLFTZRL" "PALR01" "CLDRMST"]
 
 type Stoloc
 	prtnum::AbstractString
@@ -389,6 +392,9 @@ function wherePuts(prtnums, wh_entry_ids)
 end
 
 function unitCases(dte, prtnums)
+	if length(prtnums) == 0
+		return
+	end
 	df = qSQL("SELECT distinct prtnum, untcas FROM invdtl WHERE prtnum " * @IN(prtnums) * " AND $dte")
 	unts = Dict{AbstractString, Int64}()
 	for r in 1:size(df, 1)
@@ -473,13 +479,28 @@ function getRecd(year, month)
 		push!(parts, df[:prtnum][r])
 		push!(recs, InvAct(df, r))
 	end
-	unts = unitCases(ym2range(year, month, "rcvdte"), parts)
-	for i in 1:size(recs,1)
-		recs[i].untcas = get(unts, recs[i].prtnum, 0)
+	if length(parts) > 0
+		unts = unitCases(ym2range(year, month, "rcvdte"), parts)
+		for i in 1:size(recs,1)
+			recs[i].untcas = get(unts, recs[i].prtnum, 0)
+		end
 	end
 	recs
 end
 
+function ships(year, month)
+	dte = ym2range(year, month, "lstdte")
+	df = qSQL("
+	WITH cartons as (SELECT subnum, count(*) parts from invdtl WHERE $dte AND lst_arecod='SHIP' group by subnum)
+	select count(*) as multiparts from cartons where parts > 1
+	")
+	return df[1][1]
+end
+
+function invdtl(year, month)
+	dte = ym2range(year, month, "lstdte")
+	qSQL("SELECT * from invdtl WHERE $dte")
+end
 
 # STAAHHHPPPP
 
