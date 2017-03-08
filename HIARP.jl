@@ -11,7 +11,7 @@ include("utils.jl")
 export FIFOSort, Stoloc, Part, currentStolocs, FIFOStolocs, rackFPrtnums, orderNumbers, orderLinePrtnums, ordersPrtnumList, prtnumOrderFreq, SKUs, prevOrders, stolocsHUS, wherePuts, HUSInventory, BRItems, currentPrtlocs, locAreas, itemMaster, OrdLine, orderAmntByDay, Pick, picksForYear
 export AREAS, BINS, CARTONS
 
-login("credentials.jls")
+login("G:/RedPrarie/credentials.jls")
 setLog(true)
 
 macro DF(s, def)
