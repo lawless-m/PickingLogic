@@ -18,6 +18,8 @@ macro DF(s, def)
 end
 
 const AREAS = ["HWLFTZRH" "HWLFTZRL" "PALR01" "CLDRMST" "BBINA01" "BIN01"]
+const CARTONS = ["HWLFTZRH" "HWLFTZRL" "PALR01" "CLDRMST"]
+const BINA = ["BBINA01" "BIN01"]
 
 type Stoloc
 	prtnum::AbstractString
