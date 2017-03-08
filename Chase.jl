@@ -5,6 +5,7 @@ unshift!(LOAD_PATH, "GitHub/XlsxWriter.jl/")
 include("utils.jl")
 include("merch_cats.jl")
 
+using Base.Dates
 using HIARP
 using XlsxWriter
 
@@ -20,7 +21,7 @@ end
 
 
 function aways(year, month)
-	@Xls "jan1" begin
+	@Xls "Aways" begin
 		dte = add_format!(xls, Dict("num_format"=>"d mmm yyyy"))
 		ws = add_worksheet!(xls, "Put Aways")
 		write_row!(ws, 0, 0, ["Date" "WH ENTRY ID" "lodnum" "prtnum" "qty" "stoloc" "area"])
@@ -81,7 +82,7 @@ function aways(year, month)
 end
 
 
-aways(2017, 1)
+aways(2017, 2)
 
 quit()
 

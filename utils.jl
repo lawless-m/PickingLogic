@@ -7,7 +7,7 @@ for yr in Years
 	MaxDays[yr] = yr == 2016 ? 366:365
 end
 
-
+Today = ()->Dates.format(today(), "u_d")
 
 macro push!(d, k, v)
 	return quote
@@ -45,6 +45,7 @@ macro Xls(fn, blk)
 			fn = "G:/Heinemann/" * $fn
 		end
 		
+		fn *= "_" * Today()
 		if isfile(fn * ".xlsx")
 			@printf STDERR "%s exists\n" fn * ".xlsx"
 		end

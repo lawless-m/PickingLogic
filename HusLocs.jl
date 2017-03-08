@@ -128,7 +128,7 @@ function allstolocs()
 	stolocs = stolocsHUS()
 	racks = racklist(stolocs)
 	locareas = locAreas()
-	d = Dates.format(today(), "u_d")
+	d = Today()
 	@Xls "HUSLocs_$d" begin
 		Cols = [("Area", 10) ("Loc", 12) ("Phys", 5) ("prtnum", 10) ("Descr", 35) ("Qty", 5) ("Fixed Loc", 11) ("Typecode", 12) ("Category", 25) ("Famcode", 12) ("Family", 25)]
 		bold = add_format!(xls ,Dict("bold"=>true))
