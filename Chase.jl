@@ -2,8 +2,8 @@ cd(ENV["USERPROFILE"] * "/Documents")
 unshift!(LOAD_PATH, "GitHub/PickingLogic/")
 unshift!(LOAD_PATH, "GitHub/XlsxWriter.jl/")
 
-include("utils.jl")
-include("merch_cats.jl")
+include(abspath("GitHub/PickingLogic/utils.jl"))
+include(abspath("GitHub/PickingLogic/merch_cats.jl")
 
 using Base.Dates
 using HIARP

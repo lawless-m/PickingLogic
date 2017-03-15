@@ -42,11 +42,12 @@ end
 type Part
 	prtnum::AbstractString
 	typcod::AbstractString
+	abccod::AbstractString
 	family::AbstractString
 	descr::AbstractString
-	Part() = new("", "", "", "")
-	Part(p, t, f, d) = new(p, t, f, d)
-	Part(df, r) = new(@DF(:prtnum, ""), @DF(:typcod, ""), @DF(:prtfam, ""), @DF(:dsc, ""))
+	Part() = new("", "", "", "", "")
+	Part(p, t, a, f, d) = new(p, t, a, f, d)
+	Part(df, r) = new(@DF(:prtnum, ""), @DF(:typcod, ""), @DF(:abccod, ""), @DF(:prtfam, ""), @DF(:dsc, ""))
 end
 
 type Pick # SELECT prtnum, pckqty AS qty, datum FROM pckwrk GROUP BY prtnum, datum
@@ -182,7 +183,7 @@ function fillNames(prts::Dict{AbstractString, Part}) # by prtnum
 end
 
 function itemMaster()
-	df = qSQL("SELECT DISTINCT prtnum, typcod, prtfam FROM prtmst WHERE prt_client_id ='HUS' AND wh_id_tmpl='----'")
+	df = qSQL("SELECT DISTINCT prtnum, typcod, prtfam, abccod FROM prtmst WHERE prt_client_id ='HUS' AND wh_id_tmpl='----'")
 	fillNames(DictMap(Part, :prtnum, df))
 end
 function itemMaster(prtnums)

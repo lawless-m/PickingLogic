@@ -48,7 +48,9 @@ function parsewhIDs(ws, skus, whids)
 		item = items[sku]
 		c = write_row!(ws, row, 0, [sku item.descr item.typcod Merch_cat[item.typcod]])
 		if haskey(puts, sku)
-			c += write_row!(ws, row, c, [s.stoloc for s in puts[sku]])	
+			for s in puts[sku]
+				c += write_row!(ws, row, c, split(s.stoloc, "-"))	
+			end
 		end
 		row += 1
 	end
@@ -162,7 +164,7 @@ function getRecd(ws, year, month)
 	row = row + 1
 	write_row!(ws, row, tcol-1, ["=indirect(\"R[-2]\",false) * indirect(\"R[-1]\",false)" "=indirect(\"R[-2]\",false) * indirect(\"R[-1]\",false)" "=indirect(\"C[-2]\",false)+indirect(\"C[-1]\",false)"], Fmts["dollar"])
 	
-	return "$(casesCol)$(row+1)", "$(eachesCol)$(row+1)", qtyCell
+	return "$(casesCol)$(row+1)", "$(eachesCol)$(row+1)", qtyCell, whids, skus
 end
 
 
@@ -183,7 +185,8 @@ and prtnum='66400'
 end
 
 function billing(xls, yr, mn)
-	cases, eaches, recdQty = getRecd(add_worksheet!(xls, "Recd $yr-$mn"), yr, mn)
+	cases, eaches, recdQty, whids, skus = getRecd(add_worksheet!(xls, "Recd $yr-$mn"), yr, mn)
+	parsewhIDs(add_worksheet!(xls, "Articles $yr-$mn"), skus, whids)
 	bins, carts, awayQty = aways(add_worksheet!(xls, "Init $yr-$mn"), yr, mn)
 
 	return ("'Recd $yr-$mn'!$cases", "'Recd $yr-$mn'!$eaches", "'Recd $yr-$mn'!$recdQty"), ("'Init $yr-$mn'!$bins", "'Init $yr-$mn'!$carts", "'Init $yr-$mn'!$awayQty")
@@ -205,11 +208,19 @@ function bills()
 	end
 end
 
+function bill(yr, mn)
+	@Xls "Billing_$(yr)_$(mn)" begin
+		Fmts["dte"] = add_format!(xls, Dict("num_format"=>"d mmm yyyy"))
+		Fmts["dollar"] = add_format!(xls, Dict("num_format"=>"\$#,##0.00"))
+		billing(xls, yr, mn)
+	end
+end
+
 #inv()
-#getRecd(2017, 2)
+bill(2017, 2)
 #parseReport("Billing/December_processed.xlsx")
 
-bills()
+#bills()
 
 
 

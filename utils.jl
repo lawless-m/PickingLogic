@@ -87,6 +87,10 @@ macro dena(x)
 	:(typeof($x) == DataArrays.NAtype ? "":$x)
 end
 
+macro denaI(x)
+	:(typeof($x) == DataArrays.NAtype ? 0:Int($x))
+end
+
 i64(a::Nullable{Int64}) = get(a)
 i64(a::Float64) = round(Int64, a)
 i64(a::AbstractString) = isnull(tryparse(Int64, a)) ? 0 : parse(Int64, a) 
